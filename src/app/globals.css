@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-dusk-50: #fff7ec;
+  --color-dusk-100: #fde9cf;
+  --color-dusk-200: #f9cf9b;
+  --color-dusk-400: #e9965a;
+  --color-dusk-600: #b35a2e;
+  --color-dusk-900: #2a1a14;
+  --font-display: "Georgia", "Iowan Old Style", serif;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #2a1a14;
+  color: #fff7ec;
+  -webkit-font-smoothing: antialiased;
+}
