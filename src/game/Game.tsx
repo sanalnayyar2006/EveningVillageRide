@@ -1,11 +1,16 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { ACESFilmicToneMapping, SRGBColorSpace } from "three";
 import { useGameStore } from "@/store/gameStore";
+import { AudioSystem } from "./audio/AudioSystem";
+import { installDebugHandle } from "./core/debug";
+import { input } from "./core/input/InputManager";
 import { GOLDEN_HOUR } from "./lighting/lightingConfig";
+import { PlayerSystem } from "./player/PlayerSystem";
 import { Scene } from "./Scene";
+import { ControlsHint } from "./ui/ControlsHint";
 import { LoadingScreen } from "./ui/LoadingScreen";
 
 /** Flips the game out of "loading" once everything inside Suspense has resolved. */
@@ -17,14 +22,23 @@ function Ready() {
 
 export function Game() {
   const phase = useGameStore((s) => s.phase);
+  const surfaceRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => installDebugHandle(), []);
+
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface) return;
+    return input.attach(surface);
+  }, []);
 
   return (
     <main className="fixed inset-0 select-none overflow-hidden">
-      <div className="absolute inset-0">
+      <div ref={surfaceRef} data-game-surface className="absolute inset-0 touch-none">
         <Canvas
           shadows="percentage"
           dpr={[1, 2]}
-          camera={{ position: [6, 4, 9], fov: 55, near: 0.1, far: 5000 }}
+          camera={{ position: [0, 3, 6], fov: 55, near: 0.1, far: 5000 }}
           gl={{ antialias: true, powerPreference: "high-performance" }}
           onCreated={({ gl }) => {
             gl.toneMapping = ACESFilmicToneMapping;
@@ -39,11 +53,9 @@ export function Game() {
         </Canvas>
       </div>
 
-      {phase === "playing" && (
-        <p className="pointer-events-none absolute bottom-5 left-6 text-sm text-dusk-50/80 drop-shadow">
-          Drag to orbit · Scroll to zoom
-        </p>
-      )}
+      <PlayerSystem />
+      <AudioSystem />
+      {phase === "playing" && <ControlsHint />}
       <LoadingScreen visible={phase === "loading"} />
     </main>
   );

@@ -1,4 +1,4 @@
-import type { GamePhase } from "@/types/game";
+import type { GamePhase, Vec3Tuple } from "@/types/game";
 
 /**
  * Typed event bus. Systems publish facts; other systems subscribe.
@@ -6,7 +6,7 @@ import type { GamePhase } from "@/types/game";
  */
 export interface GameEvents {
   "game:phase": { phase: GamePhase };
-  // Gameplay events (bell, photo, discovery…) are added by their owning phase.
+  "bike:bell": { position: Vec3Tuple };
 }
 
 type Handler<T> = (payload: T) => void;

@@ -28,9 +28,23 @@ Next.js 16 · React 19 · TypeScript (strict) · Three.js · React Three Fiber �
 ## Phase status
 
 - [x] **Phase 0 — Foundation**: tooling, folder architecture, input manager, event bus, stores, golden-hour scene with physics ground and player placeholder
-- [ ] Phase 1 — Core gameplay (bicycle + ride camera)
+- [x] **Phase 1 — Core gameplay**: bicycle physics (pedal, coast, brake, reverse, steer, lean), Rapier collisions, procedural roadster + IK rider, third-person ride camera (lag, drag-orbit, zoom, recenter, collision), bell, placeholder test course
 - [ ] Phase 2 — Village
 - [ ] Phase 3 — Photography + gallery
 - [ ] Phase 4 — Living world
 - [ ] Phase 5 — Polish
 - [ ] Phase 6 — Optimization
+
+## Controls (desktop)
+
+| Key        | Action                           |
+| ---------- | -------------------------------- |
+| W          | Pedal                            |
+| A / D      | Steer                            |
+| S          | Slow down · reverse when stopped |
+| Space      | Brake                            |
+| B          | Bell                             |
+| Mouse drag | Look around                      |
+| Scroll     | Camera distance                  |
+
+In development, `window.__evr` exposes the stores for debugging.

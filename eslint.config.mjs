@@ -10,6 +10,10 @@ const config = [
       // R3F scenes mutate Three.js objects inside useFrame by design.
       "react-hooks/immutability": "off",
       "react/no-unknown-property": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
     },
   },
   { ignores: [".next/**", "node_modules/**", "next-env.d.ts"] },
