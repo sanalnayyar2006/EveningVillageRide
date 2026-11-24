@@ -13,7 +13,7 @@ import { Scene } from "./Scene";
 import { ControlsHint } from "./ui/ControlsHint";
 import { LoadingScreen } from "./ui/LoadingScreen";
 
-/** Flips the game out of "loading" once everything inside Suspense has resolved. */
+/** Mounts only after everything inside Suspense (e.g. Rapier's WASM) has loaded. */
 function Ready() {
   const setPhase = useGameStore((s) => s.setPhase);
   useEffect(() => setPhase("playing"), [setPhase]);
@@ -34,7 +34,7 @@ export function Game() {
 
   return (
     <main className="fixed inset-0 select-none overflow-hidden">
-      <div ref={surfaceRef} data-game-surface className="absolute inset-0 touch-none">
+      <div ref={surfaceRef} className="absolute inset-0 touch-none">
         <Canvas
           shadows="percentage"
           dpr={[1, 2]}

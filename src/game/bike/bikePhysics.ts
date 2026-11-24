@@ -31,14 +31,14 @@ const approach = (value: number, target: number, maxDelta: number) =>
   value < target ? Math.min(value + maxDelta, target) : Math.max(value - maxDelta, target);
 
 /**
- * Advances the bike one step. Pure apart from mutating `s`; knows nothing about
- * rendering, physics engines or input devices, so it can be tested on its own.
+ * Advances the bike by `dt` seconds, mutating `s`. It knows nothing about
+ * rendering, Rapier or the keyboard, so it can be tested on its own.
  */
 export function stepBike(s: BikeSimState, input: BikeInput, dt: number, cfg: BikeConfig): void {
   const braking = input.brake > 0 || (input.back > 0 && s.speed > cfg.reverseThreshold);
   const reversing = input.back > 0 && !braking && s.speed <= cfg.reverseThreshold;
 
-  // Longitudinal.
+  // Speed.
   if (braking) {
     s.speed = approach(s.speed, 0, cfg.brakeDeceleration * Math.max(input.brake, input.back) * dt);
   } else if (input.throttle > 0 && s.speed >= -0.05) {
@@ -47,7 +47,8 @@ export function stepBike(s: BikeSimState, input: BikeInput, dt: number, cfg: Bik
   } else if (reversing) {
     s.speed = approach(s.speed, -cfg.reverseMaxSpeed, cfg.reverseAcceleration * dt);
   }
-  if (!reversing && !(input.throttle > 0)) {
+  const coasting = !reversing && input.throttle === 0;
+  if (coasting) {
     const resistance = (cfg.rollingResistance + cfg.drag * Math.abs(s.speed)) * dt;
     s.speed = approach(s.speed, 0, resistance);
   }
@@ -68,14 +69,14 @@ export function stepBike(s: BikeSimState, input: BikeInput, dt: number, cfg: Bik
   const targetLean = clamp(Math.atan((s.speed * yawRate) / GRAVITY), -cfg.maxLean, cfg.maxLean);
   s.lean += (targetLean - s.lean) * damp(cfg.leanResponse, dt);
 
-  // Visual rotation. The rear hub freewheels, so pedals only turn while pedalling.
+  // Wheel and crank spin. The rear hub freewheels, so the pedals only turn while pedalling.
   const wheelDelta = (s.speed / cfg.wheelRadius) * dt;
   s.wheelAngle += wheelDelta;
   s.pedaling = input.throttle > 0 && s.speed > 0.05;
   if (s.pedaling) s.crankAngle += wheelDelta / cfg.gearRatio;
 }
 
-/** Speed after a collision let only `moved / desired` of the motion through. */
+/** New speed when a collision let only `movedRatio` (0–1) of the intended move through. */
 export function speedAfterBump(speed: number, movedRatio: number, cfg: BikeConfig): number {
   if (movedRatio >= 0.98) return speed;
   return speed * Math.max(cfg.bumpSpeedRetention, clamp(movedRatio, 0, 1));

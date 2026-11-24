@@ -1,9 +1,9 @@
 import { create } from "zustand";
 
 /**
- * Per-frame bike telemetry. The object is mutated in place every frame
- * (transient state) so no React component re-renders at 60 fps.
- * Read it with `useBikeStore.getState().telemetry`.
+ * The bike's state for the current frame. The object is mutated in place every
+ * frame so no React component re-renders at 60 fps; read it with
+ * `useBikeStore.getState().telemetry` inside useFrame.
  */
 export interface BikeTelemetry {
   x: number;
@@ -19,12 +19,11 @@ export interface BikeTelemetry {
   steer: number;
   wheelAngle: number;
   crankAngle: number;
-  pedaling: boolean;
 }
 
 interface BikeStore {
   telemetry: BikeTelemetry;
-  /** Reactive and coarse: flips only when the bike starts or stops moving. */
+  /** The one reactive field: only changes when the bike starts or stops. */
   moving: boolean;
   setMoving: (moving: boolean) => void;
 }
@@ -42,7 +41,6 @@ export const useBikeStore = create<BikeStore>()((set, get) => ({
     steer: 0,
     wheelAngle: 0,
     crankAngle: 0,
-    pedaling: false,
   },
   moving: false,
   setMoving: (moving) => {

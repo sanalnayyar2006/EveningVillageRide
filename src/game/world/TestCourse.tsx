@@ -2,10 +2,8 @@
 
 import { RigidBody } from "@react-three/rapier";
 
-/**
- * Phase 1 placeholder: obstacles for testing collisions and the camera's
- * clipping avoidance. Removed when the village arrives in Phase 2.
- */
+// Placeholder obstacles for testing collisions and the camera. Replaced by the village in Phase 2.
+
 const CRATES: [number, number, number][] = [
   [4, 0.5, -14],
   [-6, 0.5, -20],
@@ -45,7 +43,7 @@ export function TestCourse() {
         </RigidBody>
       ))}
 
-      {/* A wall with a gap: ride through it and back the camera against it. */}
+      {/* Two walls with a gap between them. */}
       {[-9, 9].map((x) => (
         <RigidBody key={`wall-${x}`} type="fixed" colliders="cuboid" position={[x, 1.25, -62]}>
           <mesh castShadow receiveShadow>

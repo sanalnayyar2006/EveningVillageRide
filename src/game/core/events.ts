@@ -1,11 +1,10 @@
-import type { GamePhase, Vec3Tuple } from "@/types/game";
+import type { Vec3Tuple } from "@/types/game";
 
 /**
- * Typed event bus. Systems publish facts; other systems subscribe.
- * This keeps e.g. the bike from knowing that the audio system exists.
+ * Typed event bus. Systems publish facts and others subscribe, so the bike
+ * can ring its bell without knowing the audio system exists.
  */
 export interface GameEvents {
-  "game:phase": { phase: GamePhase };
   "bike:bell": { position: Vec3Tuple };
 }
 
@@ -14,6 +13,7 @@ type Handler<T> = (payload: T) => void;
 class EventBus<Events extends object> {
   private handlers = new Map<keyof Events, Set<Handler<unknown>>>();
 
+  /** Returns an unsubscribe function. */
   on<K extends keyof Events>(type: K, handler: Handler<Events[K]>): () => void {
     let set = this.handlers.get(type);
     if (!set) {
@@ -24,17 +24,12 @@ class EventBus<Events extends object> {
     return () => set.delete(handler as Handler<unknown>);
   }
 
-  emit<K extends keyof Events>(
-    type: K,
-    ...payload: Events[K] extends undefined ? [] : [Events[K]]
-  ): void {
-    const set = this.handlers.get(type);
-    if (!set) return;
-    for (const handler of [...set]) {
+  emit<K extends keyof Events>(type: K, payload: Events[K]): void {
+    for (const handler of [...(this.handlers.get(type) ?? [])]) {
       try {
-        handler(payload[0]);
+        handler(payload);
       } catch (error) {
-        // One failing subscriber must never take down the others.
+        // One broken subscriber shouldn't stop the others from hearing the event.
         console.error(`[events] handler for "${String(type)}" failed`, error);
       }
     }

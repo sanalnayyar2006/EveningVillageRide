@@ -1,17 +1,12 @@
 import { create } from "zustand";
 import type { GamePhase } from "@/types/game";
-import { events } from "@/game/core/events";
 
 interface GameStore {
   phase: GamePhase;
   setPhase: (phase: GamePhase) => void;
 }
 
-export const useGameStore = create<GameStore>()((set, get) => ({
+export const useGameStore = create<GameStore>()((set) => ({
   phase: "loading",
-  setPhase: (phase) => {
-    if (get().phase === phase) return;
-    set({ phase });
-    events.emit("game:phase", { phase });
-  },
+  setPhase: (phase) => set({ phase }),
 }));

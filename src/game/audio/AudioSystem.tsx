@@ -8,11 +8,11 @@ import { playBicycleBell } from "./synth";
 
 /** Turns game events into sound. Nothing else in the game touches audio. */
 export function AudioSystem() {
-  const master = useSettingsStore((s) => s.masterVolume);
-  const sfx = useSettingsStore((s) => s.sfxVolume);
+  const masterVolume = useSettingsStore((s) => s.masterVolume);
+  const sfxVolume = useSettingsStore((s) => s.sfxVolume);
 
   useEffect(() => audioEngine.installUnlock(), []);
-  useEffect(() => audioEngine.setVolumes(master, sfx, false), [master, sfx]);
+  useEffect(() => audioEngine.setVolumes(masterVolume, sfxVolume), [masterVolume, sfxVolume]);
 
   useGameEvent("bike:bell", () => {
     const output = audioEngine.sfxOutput();

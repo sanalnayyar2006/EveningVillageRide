@@ -1,19 +1,18 @@
 /**
- * Owns the Web Audio context and the volume buses. Browsers only allow audio
- * after a user gesture, so the context is created lazily and resumed on the
- * first key or pointer press.
+ * Owns the Web Audio context and volume buses. Browsers block audio until the
+ * user interacts, so the context is created on the first key or pointer press.
  */
 class AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private sfx: GainNode | null = null;
-  private volumes = { master: 1, sfx: 1, muted: false };
+  private volumes = { master: 1, sfx: 1 };
 
-  /** Install the one-time unlock listeners. Returns a cleanup function. */
+  /** Returns a cleanup function. */
   installUnlock(): () => void {
     const unlock = () => {
       const ctx = this.ensureContext();
-      if (ctx && ctx.state === "suspended") void ctx.resume();
+      if (ctx?.state === "suspended") void ctx.resume();
     };
     window.addEventListener("pointerdown", unlock);
     window.addEventListener("keydown", unlock);
@@ -21,6 +20,17 @@ class AudioEngine {
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("keydown", unlock);
     };
+  }
+
+  setVolumes(master: number, sfx: number): void {
+    this.volumes = { master, sfx };
+    this.applyVolumes();
+  }
+
+  /** The sfx bus to connect sounds to, or null while audio is still locked. */
+  sfxOutput(): { ctx: AudioContext; out: AudioNode } | null {
+    if (!this.ctx || !this.sfx || this.ctx.state !== "running") return null;
+    return { ctx: this.ctx, out: this.sfx };
   }
 
   private ensureContext(): AudioContext | null {
@@ -33,29 +43,19 @@ class AudioEngine {
       this.master.connect(this.ctx.destination);
       this.applyVolumes();
     } catch (error) {
-      // Audio is atmosphere, never a requirement: keep the game running silently.
+      // Sound is optional; the game keeps running silently.
       console.warn("[audio] Web Audio unavailable", error);
       this.ctx = null;
     }
     return this.ctx;
   }
 
-  setVolumes(master: number, sfx: number, muted: boolean): void {
-    this.volumes = { master, sfx, muted };
-    this.applyVolumes();
-  }
-
   private applyVolumes(): void {
     if (!this.ctx || !this.master || !this.sfx) return;
-    const t = this.ctx.currentTime;
-    this.master.gain.setTargetAtTime(this.volumes.muted ? 0 : this.volumes.master, t, 0.05);
-    this.sfx.gain.setTargetAtTime(this.volumes.sfx, t, 0.05);
-  }
-
-  /** The context and sfx bus, only if audio is unlocked and running. */
-  sfxOutput(): { ctx: AudioContext; out: AudioNode } | null {
-    if (!this.ctx || !this.sfx || this.ctx.state !== "running") return null;
-    return { ctx: this.ctx, out: this.sfx };
+    const now = this.ctx.currentTime;
+    // setTargetAtTime avoids clicks when a slider moves.
+    this.master.gain.setTargetAtTime(this.volumes.master, now, 0.05);
+    this.sfx.gain.setTargetAtTime(this.volumes.sfx, now, 0.05);
   }
 }
 

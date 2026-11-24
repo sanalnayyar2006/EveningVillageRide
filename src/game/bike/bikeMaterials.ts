@@ -1,6 +1,6 @@
 import { MeshStandardMaterial } from "three";
 
-/** Shared materials: one instance each, reused by every bike and rider mesh. */
+// One shared instance per material, reused by every mesh.
 export const BIKE_MATERIALS = {
   frame: new MeshStandardMaterial({ color: "#121212", metalness: 0.55, roughness: 0.32 }),
   chrome: new MeshStandardMaterial({ color: "#d9d6cf", metalness: 1, roughness: 0.22 }),

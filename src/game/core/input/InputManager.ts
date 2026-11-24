@@ -1,3 +1,4 @@
+import { clamp } from "@/utils/math";
 import { KEY_BINDINGS, type Action } from "./bindings";
 
 const SCROLL_KEYS = new Set(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
@@ -24,8 +25,9 @@ class InputManager {
   private lastY = 0;
   private lastLookAt = 0;
 
-  /** Attach listeners. Keyboard is window-wide; pointer look is bound to `surface`. */
+  /** Keyboard is read window-wide; drag-to-look only on `surface`. Returns a detach function. */
   attach(surface: HTMLElement): () => void {
+    surface.style.cursor = "grab";
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
       if (SCROLL_KEYS.has(e.code)) e.preventDefault();
@@ -44,6 +46,7 @@ class InputManager {
       this.lastX = e.clientX;
       this.lastY = e.clientY;
       surface.setPointerCapture(e.pointerId);
+      surface.style.cursor = "grabbing";
     };
     const onPointerMove = (e: PointerEvent) => {
       if (this.pointerId !== e.pointerId) return;
@@ -61,10 +64,12 @@ class InputManager {
       if (this.pointerId !== e.pointerId) return;
       this.pointerId = null;
       if (surface.hasPointerCapture(e.pointerId)) surface.releasePointerCapture(e.pointerId);
+      surface.style.cursor = "grab";
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      this.wheel += (Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 120)) / 120;
+      // Normalise to roughly ±1 per notch; trackpads send many small deltas.
+      this.wheel += clamp(e.deltaY, -120, 120) / 120;
     };
     const onContextMenu = (e: Event) => e.preventDefault();
 
@@ -88,6 +93,7 @@ class InputManager {
       surface.removeEventListener("pointercancel", onPointerUp);
       surface.removeEventListener("wheel", onWheel);
       surface.removeEventListener("contextmenu", onContextMenu);
+      surface.style.cursor = "";
     };
   }
 
@@ -100,7 +106,7 @@ class InputManager {
     return KEY_BINDINGS[action].some((code) => this.pressed.has(code));
   }
 
-  /** -1..1 from a pair of opposing actions. */
+  /** -1, 0 or 1 from a pair of opposing actions. */
   axis(negative: Action, positive: Action): number {
     return (this.isDown(positive) ? 1 : 0) - (this.isDown(negative) ? 1 : 0);
   }
@@ -130,13 +136,6 @@ class InputManager {
   /** Call once at the very end of every frame. */
   endFrame(): void {
     this.pressed.clear();
-  }
-
-  reset(): void {
-    this.down.clear();
-    this.pressed.clear();
-    this.consumeLook();
-    this.consumeWheel();
   }
 }
 

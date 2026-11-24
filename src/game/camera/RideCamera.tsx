@@ -2,158 +2,172 @@
 
 import { useFrame, useThree } from "@react-three/fiber";
 import { useRapier } from "@react-three/rapier";
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { PerspectiveCamera, Vector3 } from "three";
 import { BIKE_BODY_TAG, BIKE_CONFIG } from "@/game/bike/bikeConfig";
 import { FRAME_ORDER, MAX_DT } from "@/game/core/frameOrder";
 import { input } from "@/game/core/input/InputManager";
 import { groundHeight } from "@/game/world/groundQueries";
-import { useBikeStore } from "@/store/bikeStore";
+import { useBikeStore, type BikeTelemetry } from "@/store/bikeStore";
 import { usePlayerStore } from "@/store/playerStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { angleDelta, clamp, damp } from "@/utils/math";
-import { RIDE_CAMERA as C } from "./cameraConfig";
+import { RIDE_CAMERA as CAM } from "./cameraConfig";
 
-interface OrbitState {
-  /** World-space yaw of the camera's orbit (where it sits *behind*). */
+interface Orbit {
+  /** Where the camera currently sits around the bike (lags behind `heading + yawOffset`). */
   yaw: number;
-  /** Player-controlled offset from straight behind. */
+  /** How far the player has dragged the view away from straight behind. */
   yawOffset: number;
   pitch: number;
+  /** Distance the player chose with the scroll wheel. */
+  preferredDistance: number;
+  /** Actual distance this frame, shortened when scenery is in the way. */
   distance: number;
-  desiredDistance: number;
-  initialised: boolean;
 }
 
-/** The camera's view ray must ignore the bike's own collider. */
-const isNotBike = (collider: { parent(): { userData?: unknown } | null }) =>
-  (collider.parent()?.userData as { tag?: string } | undefined)?.tag !== BIKE_BODY_TAG;
+type RapierWorld = ReturnType<typeof useRapier>["world"];
+type RapierRay = InstanceType<ReturnType<typeof useRapier>["rapier"]["Ray"]>;
+
+function applyLookInput(orbit: Orbit) {
+  const { dx, dy } = input.consumeLook();
+  const wheel = input.consumeWheel();
+  const { lookSensitivity, invertY } = useSettingsStore.getState();
+  const radiansPerPixel = CAM.dragSensitivity * lookSensitivity;
+
+  orbit.yawOffset -= dx * radiansPerPixel;
+  orbit.pitch = clamp(
+    orbit.pitch + dy * radiansPerPixel * (invertY ? -1 : 1),
+    CAM.pitch.min,
+    CAM.pitch.max,
+  );
+  orbit.preferredDistance = clamp(
+    orbit.preferredDistance + wheel * CAM.distance.wheelStep,
+    CAM.distance.min,
+    CAM.distance.max,
+  );
+}
+
+/** Drift back behind the rider once they stop looking around. */
+function recenter(orbit: Orbit, bike: BikeTelemetry, dt: number) {
+  const idle = !input.isDragging && input.msSinceLook() > CAM.recenterDelayMs;
+  if (!idle || Math.abs(bike.speed) < CAM.recenterMinSpeed) return;
+  orbit.yawOffset += angleDelta(orbit.yawOffset, 0) * damp(CAM.recenterRate, dt);
+  orbit.pitch += (CAM.pitch.default - orbit.pitch) * damp(CAM.recenterRate * 0.6, dt);
+}
+
+/** How far the camera can sit along `direction` before scenery blocks the view. */
+function unobstructedDistance(
+  world: RapierWorld,
+  ray: RapierRay,
+  from: Vector3,
+  direction: Vector3,
+  wanted: number,
+): number {
+  ray.origin = { x: from.x, y: from.y, z: from.z };
+  ray.dir = { x: direction.x, y: direction.y, z: direction.z };
+  const hit = world.castRay(
+    ray,
+    wanted + CAM.collisionPadding,
+    true,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    (collider) =>
+      !collider.isSensor() &&
+      (collider.parent()?.userData as { tag?: string } | undefined)?.tag !== BIKE_BODY_TAG,
+  );
+  if (!hit) return wanted;
+  return Math.max(CAM.minCollisionDistance, hit.timeOfImpact - CAM.collisionPadding);
+}
 
 /**
- * Third-person follow camera: lags behind turns, orbits with mouse drag,
- * zooms with the wheel, recenters on its own and avoids clipping into scenery.
+ * Third-person follow camera. It lags behind turns, orbits on mouse drag,
+ * zooms with the wheel, recenters by itself and never clips into scenery.
  */
 export function RideCamera() {
-  const camera = useThree((s) => s.camera);
+  const camera = useThree((state) => state.camera);
   const { world, rapier } = useRapier();
-  const view = useRef<OrbitState>({
-    yaw: useBikeStore.getState().telemetry.heading,
-    yawOffset: 0,
-    pitch: C.pitch.default,
-    distance: C.distance.default,
-    desiredDistance: C.distance.default,
-    initialised: false,
-  });
-  const v = useMemo(
+  const orbit = useRef<Orbit | null>(null);
+  const ray = useMemo(() => new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }), [rapier]);
+  const vec = useMemo(
     () => ({
-      target: new Vector3(),
-      desired: new Vector3(),
-      dir: new Vector3(),
+      pivot: new Vector3(),
+      direction: new Vector3(),
+      position: new Vector3(),
       lookAt: new Vector3(),
     }),
     [],
   );
-  const ray = useMemo(() => new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }), [rapier]);
 
-  useEffect(() => {
-    const surface = document.querySelector<HTMLElement>("[data-game-surface]");
-    if (!surface) return;
-    const sync = () => {
-      surface.style.cursor = input.isDragging ? "grabbing" : "grab";
+  useFrame((_, frameDelta) => {
+    const dt = Math.min(frameDelta, MAX_DT);
+    const bike = useBikeStore.getState().telemetry;
+    const firstFrame = orbit.current === null;
+    orbit.current ??= {
+      yaw: bike.heading,
+      yawOffset: 0,
+      pitch: CAM.pitch.default,
+      preferredDistance: CAM.distance.default,
+      distance: CAM.distance.default,
     };
-    surface.addEventListener("pointerdown", sync);
-    surface.addEventListener("pointerup", sync);
-    sync();
-    return () => {
-      surface.removeEventListener("pointerdown", sync);
-      surface.removeEventListener("pointerup", sync);
-      surface.style.cursor = "";
-    };
-  }, []);
+    const view = orbit.current;
 
-  useFrame((_, rawDt) => {
-    const dt = Math.min(rawDt, MAX_DT);
-    const t = useBikeStore.getState().telemetry;
-    const s = view.current;
-    const settings = useSettingsStore.getState();
-    const active = usePlayerStore.getState().state === "cycling";
-
-    // Player look input.
-    const look = input.consumeLook();
-    const wheel = input.consumeWheel();
-    if (active) {
-      const k = C.dragSensitivity * settings.lookSensitivity;
-      s.yawOffset -= look.dx * k;
-      s.pitch += look.dy * k * (settings.invertY ? -1 : 1);
-      s.pitch = clamp(s.pitch, C.pitch.min, C.pitch.max);
-      s.desiredDistance = clamp(
-        s.desiredDistance + wheel * C.distance.wheelStep,
-        C.distance.min,
-        C.distance.max,
-      );
-    }
-
-    // Drift back behind the rider once they stop looking around.
-    const moving = Math.abs(t.speed) > 0.8;
-    if (moving && !input.isDragging && input.msSinceLook() > C.recenterDelayMs) {
-      s.yawOffset += angleDelta(s.yawOffset, 0) * damp(C.recenterRate, dt);
-      s.pitch += (C.pitch.default - s.pitch) * damp(C.recenterRate * 0.6, dt);
-    }
-
-    // The orbit lags behind the bike's heading, which is what makes turns feel smooth.
-    const targetYaw = t.heading + s.yawOffset;
-    if (!s.initialised) s.yaw = targetYaw;
-    s.yaw += angleDelta(s.yaw, targetYaw) * damp(input.isDragging ? 20 : C.yawFollow, dt);
-
-    v.target.set(t.x, t.y + C.targetHeight, t.z);
-    v.dir.set(
-      -Math.sin(s.yaw) * Math.cos(s.pitch),
-      Math.sin(s.pitch),
-      -Math.cos(s.yaw) * Math.cos(s.pitch),
-    );
-
-    // Pull in when scenery is between the rider and the camera.
-    let allowed = s.desiredDistance;
-    ray.origin = { x: v.target.x, y: v.target.y, z: v.target.z };
-    ray.dir = { x: v.dir.x, y: v.dir.y, z: v.dir.z };
-    const hit = world.castRay(
-      ray,
-      s.desiredDistance + C.collisionPadding,
-      true,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      (c) => !c.isSensor() && isNotBike(c),
-    );
-    if (hit) allowed = Math.max(C.minCollisionDistance, hit.timeOfImpact - C.collisionPadding);
-    s.distance =
-      allowed < s.distance
-        ? allowed
-        : s.distance + (allowed - s.distance) * damp(C.distanceRecover, dt);
-
-    v.desired.copy(v.target).addScaledVector(v.dir, s.distance);
-    v.desired.y = Math.max(v.desired.y, groundHeight(v.desired.x, v.desired.z) + C.groundClearance);
-
-    if (!s.initialised) {
-      camera.position.copy(v.desired);
-      s.initialised = true;
+    if (usePlayerStore.getState().state === "cycling") {
+      applyLookInput(view);
     } else {
-      camera.position.lerp(v.desired, damp(C.positionFollow, dt));
+      input.consumeLook();
+      input.consumeWheel();
     }
+    recenter(view, bike, dt);
 
-    const lead = t.speed * C.lookAhead;
-    v.lookAt.set(
-      t.x + Math.sin(t.heading) * lead,
-      t.y + C.targetHeight - 0.1,
-      t.z + Math.cos(t.heading) * lead,
+    // The orbit trails the bike's heading; this lag is what makes turns feel smooth.
+    const targetYaw = bike.heading + view.yawOffset;
+    const follow = input.isDragging ? CAM.dragYawFollow : CAM.yawFollow;
+    view.yaw += angleDelta(view.yaw, targetYaw) * damp(follow, dt);
+
+    vec.pivot.set(bike.x, bike.y + CAM.targetHeight, bike.z);
+    vec.direction.set(
+      -Math.sin(view.yaw) * Math.cos(view.pitch),
+      Math.sin(view.pitch),
+      -Math.cos(view.yaw) * Math.cos(view.pitch),
     );
-    camera.lookAt(v.lookAt);
+
+    // Snap in immediately when blocked, ease back out afterwards.
+    const allowed = unobstructedDistance(
+      world,
+      ray,
+      vec.pivot,
+      vec.direction,
+      view.preferredDistance,
+    );
+    view.distance =
+      allowed < view.distance
+        ? allowed
+        : view.distance + (allowed - view.distance) * damp(CAM.distanceRecover, dt);
+
+    vec.position.copy(vec.pivot).addScaledVector(vec.direction, view.distance);
+    vec.position.y = Math.max(
+      vec.position.y,
+      groundHeight(vec.position.x, vec.position.z) + CAM.groundClearance,
+    );
+    if (firstFrame) camera.position.copy(vec.position);
+    else camera.position.lerp(vec.position, damp(CAM.positionFollow, dt));
+
+    const lead = bike.speed * CAM.lookAhead;
+    vec.lookAt.set(
+      bike.x + Math.sin(bike.heading) * lead,
+      bike.y + CAM.lookHeight,
+      bike.z + Math.cos(bike.heading) * lead,
+    );
+    camera.lookAt(vec.lookAt);
 
     if (camera instanceof PerspectiveCamera) {
-      const fov = C.baseFov + C.speedFov * clamp(t.speed / BIKE_CONFIG.maxSpeed, 0, 1);
+      const speedRatio = clamp(bike.speed / BIKE_CONFIG.maxSpeed, 0, 1);
+      const fov = CAM.baseFov + CAM.speedFov * speedRatio;
       if (Math.abs(camera.fov - fov) > 0.01) {
-        camera.fov += (fov - camera.fov) * damp(3, dt);
+        camera.fov += (fov - camera.fov) * damp(CAM.fovResponse, dt);
         camera.updateProjectionMatrix();
       }
     }

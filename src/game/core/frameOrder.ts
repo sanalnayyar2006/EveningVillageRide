@@ -10,5 +10,5 @@ export const FRAME_ORDER = {
   inputEnd: -1,
 } as const;
 
-/** Largest simulation step; protects against huge jumps after a tab switch. */
+/** Longest step simulated in one frame, so a slow frame or a tab switch can't teleport the bike. */
 export const MAX_DT = 1 / 20;

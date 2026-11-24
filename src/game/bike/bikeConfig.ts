@@ -27,11 +27,11 @@ export const BIKE_CONFIG = {
   wheelRadius: 0.34,
   /** Wheel revolutions per crank revolution. */
   gearRatio: 2.4,
-  /** Fraction of desired movement below which we count as blocked. */
+  /** After hitting something, keep at least this fraction of speed (or more, if the bike slid). */
   bumpSpeedRetention: 0.35,
 } as const;
 
 export type BikeConfig = typeof BIKE_CONFIG;
 
-/** userData tag on the bike's rigid body so queries can ignore it. */
+/** Marks the bike's rigid body so the camera's ray can ignore it. */
 export const BIKE_BODY_TAG = "player-bike";

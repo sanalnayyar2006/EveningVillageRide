@@ -1,28 +1,19 @@
-export const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+export const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
 
-export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
-/** Frame-rate independent exponential smoothing factor. */
-export const damp = (lambda: number, dt: number) => 1 - Math.exp(-lambda * dt);
-
-export const smoothstep = (edge0: number, edge1: number, x: number) => {
-  const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
-  return t * t * (3 - 2 * t);
-};
+/** Frame-rate independent smoothing factor: use as `x += (target - x) * damp(rate, dt)`. */
+export const damp = (rate: number, dt: number) => 1 - Math.exp(-rate * dt);
 
 /** Shortest signed difference between two angles, in radians. */
-export const angleDelta = (from: number, to: number) => {
-  let d = (to - from) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
-  return d;
-};
+export function angleDelta(from: number, to: number): number {
+  let delta = (to - from) % (Math.PI * 2);
+  if (delta > Math.PI) delta -= Math.PI * 2;
+  if (delta < -Math.PI) delta += Math.PI * 2;
+  return delta;
+}
 
-export const easeInOutCubic = (t: number) =>
-  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
-/** Deterministic PRNG so the village is laid out identically every visit. */
-export function mulberry32(seed: number) {
+/** Seeded random generator, so generated content looks the same on every visit. */
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -32,6 +23,3 @@ export function mulberry32(seed: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-
-export const distance2D = (ax: number, az: number, bx: number, bz: number) =>
-  Math.hypot(ax - bx, az - bz);

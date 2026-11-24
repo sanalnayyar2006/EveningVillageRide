@@ -9,7 +9,7 @@ const SIZE = 1200;
 /** Metres covered by one texture tile. */
 const TILE = 8;
 
-/** Grass-like tile with a faint seam, so speed and turning read clearly on flat ground. */
+/** Speckled grass tile with a faint border, so movement is easy to see on flat ground. */
 function createGroundTexture(): CanvasTexture {
   const size = 256;
   const canvas = document.createElement("canvas");
@@ -20,8 +20,7 @@ function createGroundTexture(): CanvasTexture {
   ctx.fillRect(0, 0, size, size);
   const rand = mulberry32(11);
   for (let i = 0; i < 900; i++) {
-    const shade = rand() < 0.5 ? "rgba(70,90,30,0.1)" : "rgba(200,190,110,0.1)";
-    ctx.fillStyle = shade;
+    ctx.fillStyle = rand() < 0.5 ? "rgba(70,90,30,0.1)" : "rgba(200,190,110,0.1)";
     ctx.beginPath();
     ctx.arc(rand() * size, rand() * size, 1 + rand() * 4, 0, Math.PI * 2);
     ctx.fill();

@@ -12,8 +12,9 @@ export const GOLDEN_HOUR = {
   fogColor: "#d9a284",
   fogNear: 45,
   fogFar: 280,
+  /** Three's Sky shader is very bright, so exposure is low and the lights compensate. */
   exposure: 0.55,
   sky: { turbidity: 12, rayleigh: 4, mieCoefficient: 0.008, mieDirectionalG: 0.82 },
-  /** Half-size of the area the sun's shadow map covers around the player. */
+  /** Half-size of the square the sun's shadow map covers. */
   shadowExtent: 40,
 } as const;
