@@ -11,6 +11,8 @@ const RIDE_CONTROLS: { keys: string[]; label: string }[] = [
   { keys: ["S"], label: "Slow down · reverse" },
   { keys: ["Space"], label: "Brake" },
   { keys: ["B"], label: "Bell" },
+  { keys: ["C"], label: "Phone camera" },
+  { keys: ["G"], label: "Album" },
   { keys: ["Drag"], label: "Look around" },
   { keys: ["Scroll"], label: "Camera distance" },
 ];

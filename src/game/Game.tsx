@@ -3,15 +3,19 @@
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useEffect, useRef } from "react";
 import { ACESFilmicToneMapping, SRGBColorSpace } from "three";
+import { useGalleryStore } from "@/store/galleryStore";
 import { useGameStore } from "@/store/gameStore";
+import { usePlayerStore } from "@/store/playerStore";
 import { AudioSystem } from "./audio/AudioSystem";
-import { installDebugHandle } from "./core/debug";
+import { installDebugHandle, registerRenderer } from "./core/debug";
 import { input } from "./core/input/InputManager";
 import { GOLDEN_HOUR } from "./lighting/lightingConfig";
 import { PlayerSystem } from "./player/PlayerSystem";
 import { Scene } from "./Scene";
 import { ControlsHint } from "./ui/ControlsHint";
+import { Gallery } from "./ui/gallery/Gallery";
 import { LoadingScreen } from "./ui/LoadingScreen";
+import { PhotoHud } from "./ui/PhotoHud";
 
 /** Mounts only after everything inside Suspense (e.g. Rapier's WASM) has loaded. */
 function Ready() {
@@ -22,9 +26,11 @@ function Ready() {
 
 export function Game() {
   const phase = useGameStore((s) => s.phase);
+  const riding = usePlayerStore((s) => s.state === "cycling");
   const surfaceRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => installDebugHandle(), []);
+  useEffect(() => void useGalleryStore.getState().load(), []);
 
   useEffect(() => {
     const surface = surfaceRef.current;
@@ -44,6 +50,7 @@ export function Game() {
             gl.toneMapping = ACESFilmicToneMapping;
             gl.toneMappingExposure = GOLDEN_HOUR.exposure;
             gl.outputColorSpace = SRGBColorSpace;
+            registerRenderer(gl);
           }}
         >
           <Suspense fallback={null}>
@@ -55,7 +62,9 @@ export function Game() {
 
       <PlayerSystem />
       <AudioSystem />
-      {phase === "playing" && <ControlsHint />}
+      {phase === "playing" && riding && <ControlsHint />}
+      <PhotoHud />
+      <Gallery />
       <LoadingScreen visible={phase === "loading"} />
     </main>
   );

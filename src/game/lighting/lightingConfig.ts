@@ -8,7 +8,7 @@ export const GOLDEN_HOUR = {
   sunIntensity: 4.8,
   skyColor: "#ffd4a3",
   groundColor: "#6b5236",
-  hemisphereIntensity: 1.5,
+  hemisphereIntensity: 1.9,
   fogColor: "#d9a284",
   fogNear: 45,
   fogFar: 280,
@@ -16,5 +16,5 @@ export const GOLDEN_HOUR = {
   exposure: 0.55,
   sky: { turbidity: 12, rayleigh: 4, mieCoefficient: 0.008, mieDirectionalG: 0.82 },
   /** Half-size of the square the sun's shadow map covers. */
-  shadowExtent: 40,
+  shadowExtent: 45,
 } as const;

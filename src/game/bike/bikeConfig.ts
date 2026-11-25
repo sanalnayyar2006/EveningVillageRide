@@ -11,8 +11,10 @@ export const BIKE_CONFIG = {
   brakeDeceleration: 6.5,
   reverseMaxSpeed: 1.5,
   reverseAcceleration: 1.4,
-  /** Below this speed, S reverses instead of braking. */
-  reverseThreshold: 0.25,
+  /** Below this speed (m/s) the bike counts as stopped. */
+  stoppedSpeed: 0.05,
+  /** Keep holding S this long after stopping before the bike starts to reverse (s). */
+  reverseDelay: 0.35,
 
   /** Handlebar angle at walking pace and at top speed (radians). */
   maxSteerSlow: 0.55,
@@ -32,6 +34,3 @@ export const BIKE_CONFIG = {
 } as const;
 
 export type BikeConfig = typeof BIKE_CONFIG;
-
-/** Marks the bike's rigid body so the camera's ray can ignore it. */
-export const BIKE_BODY_TAG = "player-bike";

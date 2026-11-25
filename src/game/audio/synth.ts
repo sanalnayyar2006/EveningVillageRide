@@ -35,3 +35,29 @@ export function playBicycleBell(ctx: AudioContext, out: AudioNode) {
   strikeBell(ctx, out, start, pitch, 0.16);
   strikeBell(ctx, out, start + 0.13, pitch * 1.005, 0.13);
 }
+
+/** A short burst of filtered noise: one blade of a camera shutter. */
+function shutterClick(ctx: AudioContext, out: AudioNode, startTime: number, volume: number) {
+  const length = Math.floor(ctx.sampleRate * 0.03);
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 3;
+
+  const noise = ctx.createBufferSource();
+  noise.buffer = buffer;
+  const filter = ctx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.value = 3200;
+  filter.Q.value = 0.8;
+  const gain = ctx.createGain();
+  gain.gain.value = volume;
+  noise.connect(filter).connect(gain).connect(out);
+  noise.start(startTime);
+}
+
+/** The "click-clack" a phone plays when it takes a picture. */
+export function playShutter(ctx: AudioContext, out: AudioNode) {
+  const start = ctx.currentTime + 0.005;
+  shutterClick(ctx, out, start, 0.5);
+  shutterClick(ctx, out, start + 0.075, 0.35);
+}

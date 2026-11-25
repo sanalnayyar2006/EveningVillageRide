@@ -6,6 +6,7 @@ import type { Vec3Tuple } from "@/types/game";
  */
 export interface GameEvents {
   "bike:bell": { position: Vec3Tuple };
+  "photo:taken": { id: string };
 }
 
 type Handler<T> = (payload: T) => void;

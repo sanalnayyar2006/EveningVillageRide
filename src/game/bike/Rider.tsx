@@ -3,7 +3,11 @@
 import { useFrame } from "@react-three/fiber";
 import { useLayoutEffect, useRef } from "react";
 import { CylinderGeometry, Group, Mesh, SphereGeometry, Vector3, type Material } from "three";
+import { firstPersonBlend } from "@/game/photography/photoConfig";
+import { PhoneModel } from "@/game/photography/PhoneModel";
 import { useBikeStore } from "@/store/bikeStore";
+import { usePhotoStore } from "@/store/photoStore";
+import { smoothstep } from "@/utils/math";
 import { placeBetween, solveTwoBone } from "@/utils/limbs";
 import { gripPosition, pedalPosition } from "./bikeGeometry";
 import { RIDER_MATERIALS as mat } from "./bikeMaterials";
@@ -34,6 +38,16 @@ const JOINTS = {
 const KNEE_POLE = new Vector3(0, 0.4, 1);
 const ELBOW_POLE_LEFT = new Vector3(0.7, -1, -0.4);
 const ELBOW_POLE_RIGHT = new Vector3(-0.7, -1, -0.4);
+
+/** Where the right hand goes to take the phone out, and where it holds it up to frame a shot. */
+const PHONE_REACH = {
+  pocket: new Vector3(-0.21, 1.0, -0.14),
+  hold: new Vector3(-0.09, 1.62, 0.3),
+  /** From the hand to the middle of the phone, which is held by its right edge. */
+  grip: new Vector3(0.06, 0.015, 0.012),
+};
+/** Hide the rider once the camera is nearly inside their head. */
+const HIDE_AT_BLEND = 0.6;
 
 /** Feet sit slightly above the pedal axle. */
 const FOOT_LIFT = 0.045;
@@ -77,6 +91,14 @@ function Limb({ ref, style }: { ref: React.Ref<Group>; style: LimbStyle }) {
 const joint = new Vector3();
 const end = new Vector3();
 const target = new Vector3();
+const grip = new Vector3();
+
+/** Right-hand target for phone `raise` 0..1: handlebar → pocket → up in front of the face. */
+function phoneHandTarget(raise: number, handlebar: Vector3, out: Vector3): Vector3 {
+  const toPocket = smoothstep(0, 0.4, raise);
+  const toFace = smoothstep(0.4, 1, raise);
+  return out.lerpVectors(handlebar, PHONE_REACH.pocket, toPocket).lerp(PHONE_REACH.hold, toFace);
+}
 
 /** Solve the IK for one limb and move its meshes into place. */
 function poseLimb(
@@ -108,6 +130,7 @@ export function Rider() {
   const legRight = useRef<Group>(null);
   const armLeft = useRef<Group>(null);
   const armRight = useRef<Group>(null);
+  const phone = useRef<Group>(null);
 
   useLayoutEffect(() => {
     if (torso.current) {
@@ -122,6 +145,8 @@ export function Rider() {
 
   useFrame((state) => {
     const { crankAngle, steer } = useBikeStore.getState().telemetry;
+    const { raise } = usePhotoStore.getState().rig;
+    if (group.current) group.current.visible = firstPersonBlend(raise) < HIDE_AT_BLEND;
 
     pedalPosition(crankAngle, 1, target).y += FOOT_LIFT;
     poseLimb(legLeft.current, JOINTS.hipLeft, target, BODY.thigh, BODY.shin, KNEE_POLE);
@@ -137,7 +162,7 @@ export function Rider() {
       BODY.forearm,
       ELBOW_POLE_LEFT,
     );
-    gripPosition(steer, -1, target);
+    phoneHandTarget(raise, gripPosition(steer, -1, grip), target);
     poseLimb(
       armRight.current,
       JOINTS.shoulderRight,
@@ -146,6 +171,13 @@ export function Rider() {
       BODY.forearm,
       ELBOW_POLE_RIGHT,
     );
+
+    if (phone.current) {
+      // The phone appears once the hand is in the pocket.
+      phone.current.visible = raise > 0.4;
+      phone.current.position.copy(armRight.current?.children[3]?.position ?? target);
+      phone.current.position.add(PHONE_REACH.grip);
+    }
 
     if (head.current) {
       // Look into turns, with a slight breathing bob.
@@ -192,6 +224,7 @@ export function Rider() {
       <Limb ref={legRight} style={LEG} />
       <Limb ref={armLeft} style={ARM} />
       <Limb ref={armRight} style={ARM} />
+      <PhoneModel ref={phone} />
     </group>
   );
 }

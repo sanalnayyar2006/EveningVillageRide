@@ -3,11 +3,12 @@
 import { Physics } from "@react-three/rapier";
 import { BikeController } from "./bike/BikeController";
 import { BikeModel } from "./bike/BikeModel";
+import { PhotoCamera } from "./camera/PhotoCamera";
 import { RideCamera } from "./camera/RideCamera";
 import { InputFrameEnd } from "./core/input/InputFrameEnd";
 import { Lighting } from "./lighting/Lighting";
-import { Ground } from "./world/Ground";
-import { TestCourse } from "./world/TestCourse";
+import { PhotoMode } from "./photography/PhotoMode";
+import { World } from "./world/World";
 
 /**
  * Scene graph root (Architecture.md §10). Frame-update order is set by
@@ -18,12 +19,13 @@ export function Scene() {
     <>
       <Lighting />
       <Physics>
-        <Ground />
-        <TestCourse />
+        <World />
         <BikeController />
         <RideCamera />
+        <PhotoCamera />
       </Physics>
       <BikeModel />
+      <PhotoMode />
       <InputFrameEnd />
     </>
   );

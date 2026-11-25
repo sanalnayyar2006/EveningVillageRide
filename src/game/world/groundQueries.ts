@@ -1,8 +1,8 @@
-// Flat ground for now. The village terrain (Phase 2) plugs in behind these same functions.
+import { WORLD } from "./data/layout";
+import { heightAt, slopeAt } from "./terrain";
 
-/** The bike can't ride further than this from the world origin (metres). */
-export const RIDE_RADIUS = 150;
+/** The bike can't ride further than this from the village centre (metres). */
+export const RIDE_RADIUS = WORLD.rideRadius;
 
-export function groundHeight(_x: number, _z: number): number {
-  return 0;
-}
+export const groundHeight = heightAt;
+export const groundSlope = slopeAt;
