@@ -1,4 +1,4 @@
-# Evening Village Ride: Phase 0 + Phase 1 Deep Dive
+a# Evening Village Ride: Phase 0 + Phase 1 Deep Dive
 
 This document explains everything built through Phase 1: what each piece does, why it is built that way, and how to answer questions about it. It describes the current working tree, about 2,000 lines of TypeScript in `src/`.
 
