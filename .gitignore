@@ -7,3 +7,5 @@ next-env.d.ts
 .DS_Store
 .vercel
 docs/
+node_modules.nosync
+.next.nosync

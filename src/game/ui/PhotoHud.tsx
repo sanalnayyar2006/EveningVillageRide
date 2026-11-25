@@ -53,6 +53,7 @@ export function PhotoHud() {
     <AnimatePresence>
       {ready && (
         <motion.div
+          key="photo-hud"
           className="pointer-events-none absolute inset-0 flex items-center justify-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { Kbd } from "@/components/Kbd";
 import type { GalleryPhoto } from "@/store/galleryStore";
 import { downloadName, formatTaken } from "./photoFormat";
@@ -18,7 +18,10 @@ interface PhotoViewerProps {
 const BUTTON =
   "rounded-full border border-dusk-50/25 px-4 py-1.5 text-sm transition-colors hover:bg-dusk-50/10 focus-visible:outline-2 focus-visible:outline-dusk-200";
 
-/** One photo, full size, with download and delete. */
+/**
+ * One photo, full size, with download and delete. The album keys it by photo
+ * id, so a pending delete confirmation never carries over to the next photo.
+ */
 export function PhotoViewer({
   photo,
   position,
@@ -28,10 +31,6 @@ export function PhotoViewer({
   onClose,
 }: PhotoViewerProps) {
   const [confirming, setConfirming] = useState(false);
-  const imageUrl = useMemo(() => URL.createObjectURL(photo.image), [photo.image]);
-  useEffect(() => () => URL.revokeObjectURL(imageUrl), [imageUrl]);
-  // A delete confirmation never carries over to the next photo.
-  useEffect(() => setConfirming(false), [photo.id]);
 
   return (
     <motion.div
@@ -53,7 +52,7 @@ export function PhotoViewer({
           ‹
         </button>
         <img
-          src={imageUrl}
+          src={photo.imageUrl}
           alt={`${photo.place}, ${formatTaken(photo.takenAt)}`}
           className="max-h-full min-w-0 rounded-md object-contain shadow-2xl"
         />
@@ -68,7 +67,7 @@ export function PhotoViewer({
           <p className="text-sm text-dusk-100/70">{formatTaken(photo.takenAt)}</p>
         </div>
         <div className="flex items-center gap-2">
-          <a className={BUTTON} href={imageUrl} download={downloadName(photo)}>
+          <a className={BUTTON} href={photo.imageUrl} download={downloadName(photo)}>
             Download
           </a>
           {confirming ? (

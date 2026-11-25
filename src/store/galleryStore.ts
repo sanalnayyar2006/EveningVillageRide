@@ -2,8 +2,9 @@ import { create } from "zustand";
 import { photoDb, type PhotoRecord } from "@/game/photography/photoDb";
 
 export interface GalleryPhoto extends PhotoRecord {
-  /** Object URL for the thumbnail, alive for as long as the photo is in the album. */
+  /** Object URLs for the thumbnail and full image, alive for as long as the photo is in the album. */
   thumbnailUrl: string;
+  imageUrl: string;
 }
 
 interface GalleryStore {
@@ -18,6 +19,7 @@ interface GalleryStore {
 const withUrl = (photo: PhotoRecord): GalleryPhoto => ({
   ...photo,
   thumbnailUrl: URL.createObjectURL(photo.thumbnail),
+  imageUrl: URL.createObjectURL(photo.image),
 });
 
 const newestFirst = (a: PhotoRecord, b: PhotoRecord) => b.takenAt.localeCompare(a.takenAt);
@@ -49,6 +51,7 @@ export const useGalleryStore = create<GalleryStore>()((set, get) => ({
     if (!photo) return;
     set((s) => ({ photos: s.photos.filter((p) => p.id !== id) }));
     URL.revokeObjectURL(photo.thumbnailUrl);
+    URL.revokeObjectURL(photo.imageUrl);
     await photoDb.delete(id).catch((error: unknown) => {
       console.warn("[gallery] could not delete saved photo", error);
     });

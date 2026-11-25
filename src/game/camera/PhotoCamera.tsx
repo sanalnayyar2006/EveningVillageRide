@@ -36,12 +36,23 @@ function applyLookInput(rig: PhotoRig) {
   rig.fov = clamp(rig.fov + wheel * CFG.fov.wheelStep, CFG.fov.min, CFG.fov.max);
 }
 
-/** First distance at which the ray dips below the terrain, or null. */
+/** Height of the ray above the terrain at distance `d`; negative once it is underground. */
+const clearance = (from: Vector3, direction: Vector3, d: number) =>
+  from.y + direction.y * d - groundHeight(from.x + direction.x * d, from.z + direction.z * d);
+
+/** Where the view ray meets the terrain, or null if it doesn't within `maxDistance`. */
 function groundHitDistance(from: Vector3, direction: Vector3, maxDistance: number): number | null {
   for (let d = GROUND_STEP; d <= maxDistance; d += GROUND_STEP) {
-    const x = from.x + direction.x * d;
-    const z = from.z + direction.z * d;
-    if (from.y + direction.y * d < groundHeight(x, z)) return d;
+    if (clearance(from, direction, d) >= 0) continue;
+    // Crossed the ground in the last step; narrow it down.
+    let above = d - GROUND_STEP;
+    let below = d;
+    for (let i = 0; i < 6; i++) {
+      const mid = (above + below) / 2;
+      if (clearance(from, direction, mid) < 0) below = mid;
+      else above = mid;
+    }
+    return (above + below) / 2;
   }
   return null;
 }

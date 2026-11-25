@@ -3,7 +3,6 @@
 import { useFrame } from "@react-three/fiber";
 import { useLayoutEffect, useRef } from "react";
 import { CylinderGeometry, Group, Mesh, SphereGeometry, Vector3, type Material } from "three";
-import { firstPersonBlend } from "@/game/photography/photoConfig";
 import { PhoneModel } from "@/game/photography/PhoneModel";
 import { useBikeStore } from "@/store/bikeStore";
 import { usePhotoStore } from "@/store/photoStore";
@@ -46,8 +45,8 @@ const PHONE_REACH = {
   /** From the hand to the middle of the phone, which is held by its right edge. */
   grip: new Vector3(0.06, 0.015, 0.012),
 };
-/** Hide the rider once the camera is nearly inside their head. */
-const HIDE_AT_BLEND = 0.6;
+/** Hide the rider once the camera is this close (m) to their head, so it never ends up inside it. */
+const HIDE_DISTANCE = 0.9;
 
 /** Feet sit slightly above the pedal axle. */
 const FOOT_LIFT = 0.045;
@@ -92,6 +91,7 @@ const joint = new Vector3();
 const end = new Vector3();
 const target = new Vector3();
 const grip = new Vector3();
+const headWorld = new Vector3();
 
 /** Right-hand target for phone `raise` 0..1: handlebar → pocket → up in front of the face. */
 function phoneHandTarget(raise: number, handlebar: Vector3, out: Vector3): Vector3 {
@@ -146,7 +146,6 @@ export function Rider() {
   useFrame((state) => {
     const { crankAngle, steer } = useBikeStore.getState().telemetry;
     const { raise } = usePhotoStore.getState().rig;
-    if (group.current) group.current.visible = firstPersonBlend(raise) < HIDE_AT_BLEND;
 
     pedalPosition(crankAngle, 1, target).y += FOOT_LIFT;
     poseLimb(legLeft.current, JOINTS.hipLeft, target, BODY.thigh, BODY.shin, KNEE_POLE);
@@ -177,6 +176,12 @@ export function Rider() {
       phone.current.visible = raise > 0.4;
       phone.current.position.copy(armRight.current?.children[3]?.position ?? target);
       phone.current.position.add(PHONE_REACH.grip);
+    }
+
+    if (group.current && head.current) {
+      head.current.getWorldPosition(headWorld);
+      group.current.visible =
+        raise === 0 || state.camera.position.distanceTo(headWorld) > HIDE_DISTANCE;
     }
 
     if (head.current) {
