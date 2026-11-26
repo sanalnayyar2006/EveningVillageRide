@@ -15,7 +15,7 @@ export function buildWaterTank(b: GeometryBatch) {
     [-s, s],
   ];
 
-  onGround(b, WATER_TANK.x, WATER_TANK.z, 0, () => {
+  onGround(b, WATER_TANK.x, WATER_TANK.z, WATER_TANK.rot, () => {
     for (const [x, z] of corners) {
       b.cylinder(0.24, 0.3, tankHeight, [x, tankHeight / 2, z], CONCRETE, 8);
     }

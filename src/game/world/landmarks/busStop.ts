@@ -6,8 +6,7 @@ import { onGround } from "../scenery/place";
 /** A concrete shelter facing the main road, with a bench and a sign post. */
 export function buildBusStop(b: GeometryBatch) {
   const { length, depth, height } = BUS_STOP;
-  // Facing -X, towards the road.
-  onGround(b, BUS_STOP.x, BUS_STOP.z, -Math.PI / 2, () => {
+  onGround(b, BUS_STOP.x, BUS_STOP.z, BUS_STOP.rot, () => {
     b.box([length, 0.15, depth], [0, 0.075, 0], PALETTE.stone);
     b.box([length, height, 0.2], [0, height / 2, -depth / 2], "#79b4be");
     b.box([length, 0.6, 0.22], [0, 0.3, -depth / 2], "#3e6f7a");
@@ -26,9 +25,9 @@ export function buildBusStop(b: GeometryBatch) {
   });
 }
 
-/** Sign plate on the post beside the shelter, in world space. */
-export const BUS_STOP_SIGN = {
-  x: BUS_STOP.x - BUS_STOP.depth / 2,
-  z: BUS_STOP.z + BUS_STOP.length / 2 + 0.8,
-  y: 2.55,
-} as const;
+/** Sign plate on the post beside the shelter, in the shelter's local space. */
+export const BUS_STOP_SIGN: [number, number, number] = [
+  BUS_STOP.length / 2 + 0.8,
+  2.55,
+  BUS_STOP.depth / 2 + 0.05,
+];

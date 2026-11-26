@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import { BufferAttribute, BufferGeometry } from "three";
-import { ROADS, type RoadSegment, type RoadSurface } from "./data/layout";
+import { ROADS, type Road, type RoadSurface } from "./data/layout";
+import type { Point } from "./data/mapSource";
 import { heightAt } from "./terrain";
 import { WORLD_MATERIALS } from "./worldMaterials";
 
@@ -18,16 +19,15 @@ function pushVertex(out: Triangles, x: number, z: number) {
   out.push(x, heightAt(x, z) + LIFT, z);
 }
 
-/** A strip of quads along the segment, draped over the terrain. */
-function addStrip(out: Triangles, road: RoadSegment) {
-  const [ax, az] = road.from;
-  const [bx, bz] = road.to;
+/** A strip of quads from `a` to `b`, draped over the terrain. */
+function addStrip(out: Triangles, [ax, az]: Point, [bx, bz]: Point, width: number) {
   const length = Math.hypot(bx - ax, bz - az);
+  if (length === 0) return;
   const steps = Math.max(1, Math.ceil(length / STEP));
   // Unit vector pointing across the road.
   const sideX = -(bz - az) / length;
   const sideZ = (bx - ax) / length;
-  const half = road.width / 2;
+  const half = width / 2;
 
   for (let i = 0; i < steps; i++) {
     const t0 = i / steps;
@@ -46,7 +46,7 @@ function addStrip(out: Triangles, road: RoadSegment) {
   }
 }
 
-/** A round disc at a road end, so junctions and dead ends look rounded instead of cut off. */
+/** A round disc at every bend and end, filling the gaps between straight strips. */
 function addCap(out: Triangles, [cx, cz]: [number, number], radius: number) {
   for (let i = 0; i < CAP_SEGMENTS; i++) {
     const a0 = (i / CAP_SEGMENTS) * Math.PI * 2;
@@ -57,13 +57,17 @@ function addCap(out: Triangles, [cx, cz]: [number, number], radius: number) {
   }
 }
 
+function addRoad(out: Triangles, road: Road) {
+  road.points.forEach((point, i) => {
+    const next = road.points[i + 1];
+    if (next) addStrip(out, point, next, road.width);
+    addCap(out, point, road.width / 2);
+  });
+}
+
 function buildRoads(surface: RoadSurface): BufferGeometry {
   const triangles: Triangles = [];
-  for (const road of ROADS.filter((r) => r.surface === surface)) {
-    addStrip(triangles, road);
-    addCap(triangles, road.from, road.width / 2);
-    addCap(triangles, road.to, road.width / 2);
-  }
+  for (const road of ROADS.filter((r) => r.surface === surface)) addRoad(triangles, road);
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new BufferAttribute(new Float32Array(triangles), 3));
   geometry.computeVertexNormals();

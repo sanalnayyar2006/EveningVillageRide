@@ -4,18 +4,34 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import { BufferAttribute, BufferGeometry, DoubleSide, type Mesh } from "three";
 import { createSignTexture } from "./canvasText";
+import { localToWorld } from "./data/geometry";
+import { px } from "./data/mapSource";
+import {
+  BUS_STOP,
+  GATE,
+  HOSPITAL,
+  SCHOOL,
+  SUBSTATION,
+  TEA_STALL,
+  TEMPLE,
+  type Placement,
+} from "./data/structures";
 import { BUS_STOP_SIGN } from "./landmarks/busStop";
-import { GATE_SIGN } from "./landmarks/gate";
+import { GATE_SIGN_Y } from "./landmarks/gate";
+import { HOSPITAL_SIGN } from "./landmarks/hospital";
 import { SCHOOL_SIGN } from "./landmarks/school";
+import { SUBSTATION_SIGN } from "./landmarks/substation";
 import { TEA_STALL_SIGN } from "./landmarks/teaStall";
 import { TEMPLE_SPIRE_TOP } from "./landmarks/temple";
 import { heightAt } from "./terrain";
 import { PALETTE } from "./worldMaterials";
 
 interface SignSpec {
-  position: [number, number, number];
-  /** Radians; 0 faces +Z (south), -π/2 faces -X (west). */
-  rotationY: number;
+  /** The landmark the sign belongs to; `local` and `turn` are relative to it. */
+  anchor: Placement;
+  local: [number, number, number];
+  /** Extra turn on top of the anchor's; π for a board facing out of the back. */
+  turn?: number;
   width: number;
   height: number;
   lines: string[];
@@ -23,32 +39,35 @@ interface SignSpec {
   color: string;
 }
 
-const FACE_SOUTH = 0;
-const FACE_NORTH = Math.PI;
-const FACE_WEST = -Math.PI / 2;
+/** Where the direction sign stands, beside the village road just inside the gate. */
+const SIGNPOST = (() => {
+  const [x, z] = px(694, 660);
+  return { x, z, rot: 0 };
+})();
 
 const SIGNS: SignSpec[] = [
   {
-    position: [0, GATE_SIGN.y, GATE_SIGN.z + 0.31],
-    rotationY: FACE_SOUTH,
-    width: GATE_SIGN.width,
-    height: GATE_SIGN.height,
+    anchor: GATE,
+    local: [0, GATE_SIGN_Y, 0.31],
+    width: 6.2,
+    height: 0.7,
     lines: ["स्वागत है  ·  WELCOME"],
     background: "#9c2a17",
     color: "#ffe08a",
   },
   {
-    position: [0, GATE_SIGN.y, GATE_SIGN.z - 0.31],
-    rotationY: FACE_NORTH,
-    width: GATE_SIGN.width,
-    height: GATE_SIGN.height,
+    anchor: GATE,
+    local: [0, GATE_SIGN_Y, -0.31],
+    turn: Math.PI,
+    width: 6.2,
+    height: 0.7,
     lines: ["फिर आइएगा  ·  COME AGAIN"],
     background: "#9c2a17",
     color: "#ffe08a",
   },
   {
-    position: [BUS_STOP_SIGN.x - 0.05, BUS_STOP_SIGN.y, BUS_STOP_SIGN.z],
-    rotationY: FACE_WEST,
+    anchor: BUS_STOP,
+    local: BUS_STOP_SIGN,
     width: 0.7,
     height: 0.45,
     lines: ["बस स्टॉप", "BUS STOP"],
@@ -56,8 +75,8 @@ const SIGNS: SignSpec[] = [
     color: "#ffffff",
   },
   {
-    position: [TEA_STALL_SIGN.x, TEA_STALL_SIGN.y, TEA_STALL_SIGN.z],
-    rotationY: FACE_WEST,
+    anchor: TEA_STALL,
+    local: TEA_STALL_SIGN,
     width: 2.8,
     height: 0.55,
     lines: ["चाय  ·  Ramu Tea Stall"],
@@ -65,8 +84,8 @@ const SIGNS: SignSpec[] = [
     color: "#5a1d0e",
   },
   {
-    position: [SCHOOL_SIGN.x, SCHOOL_SIGN.y, SCHOOL_SIGN.z],
-    rotationY: FACE_NORTH,
+    anchor: SCHOOL,
+    local: SCHOOL_SIGN,
     width: 7,
     height: 0.85,
     lines: ["राजकीय प्राथमिक विद्यालय", "Government Primary School"],
@@ -74,15 +93,43 @@ const SIGNS: SignSpec[] = [
     color: "#1f3b8c",
   },
   {
-    position: [4, 2.2, 3.9],
-    rotationY: FACE_SOUTH,
+    anchor: HOSPITAL,
+    local: HOSPITAL_SIGN,
+    width: 6,
+    height: 0.7,
+    lines: ["अस्पताल  ·  HOSPITAL"],
+    background: "#ffffff",
+    color: "#c8232c",
+  },
+  {
+    anchor: SUBSTATION,
+    local: SUBSTATION_SIGN,
+    turn: Math.PI,
+    width: 1.4,
+    height: 0.7,
+    lines: ["खतरा  ·  DANGER", "220 kV"],
+    background: "#f4d23c",
+    color: "#b3151b",
+  },
+  {
+    anchor: SIGNPOST,
+    local: [0, 2.2, 0.05],
     width: 1.6,
     height: 0.6,
-    lines: ["← मंदिर  Temple", "Market  बाज़ार →"],
+    lines: ["↑ मंदिर  Temple", "← बाज़ार  Market"],
     background: "#2f6b3a",
     color: "#ffffff",
   },
 ];
+
+/** A local point on a landmark, in world space, standing on the ground under the landmark. */
+function worldPoint(
+  anchor: Placement,
+  [lx, ly, lz]: [number, number, number],
+): [number, number, number] {
+  const [x, z] = localToWorld(anchor.x, anchor.z, anchor.rot, lx, lz);
+  return [x, heightAt(anchor.x, anchor.z) + ly, z];
+}
 
 function Sign({ spec }: { spec: SignSpec }) {
   const texture = useMemo(
@@ -98,7 +145,10 @@ function Sign({ spec }: { spec: SignSpec }) {
   useEffect(() => () => texture.dispose(), [texture]);
 
   return (
-    <mesh position={spec.position} rotation-y={spec.rotationY}>
+    <mesh
+      position={worldPoint(spec.anchor, spec.local)}
+      rotation-y={spec.anchor.rot + (spec.turn ?? 0)}
+    >
       <planeGeometry args={[spec.width, spec.height]} />
       {/* A little self-light keeps the paint readable when the board faces away from the sun. */}
       <meshStandardMaterial
@@ -112,11 +162,11 @@ function Sign({ spec }: { spec: SignSpec }) {
   );
 }
 
-/** Post for the free-standing direction sign at the crossroads. */
+/** Post for the free-standing direction sign by the gate. */
 function SignPost() {
-  const ground = heightAt(4, 3.9);
+  const ground = heightAt(SIGNPOST.x, SIGNPOST.z);
   return (
-    <mesh position={[4, ground + 1.2, 3.85]} castShadow>
+    <mesh position={[SIGNPOST.x, ground + 1.2, SIGNPOST.z]} castShadow>
       <cylinderGeometry args={[0.05, 0.05, 2.4, 6]} />
       <meshStandardMaterial color={PALETTE.iron} />
     </mesh>
@@ -138,8 +188,7 @@ function pennantGeometry(): BufferGeometry {
 function TempleFlag() {
   const flag = useRef<Mesh>(null);
   const geometry = useMemo(() => pennantGeometry(), []);
-  const { x, y, z } = TEMPLE_SPIRE_TOP;
-  const ground = heightAt(x, z);
+  const top = worldPoint(TEMPLE, TEMPLE_SPIRE_TOP);
 
   useFrame(({ clock }) => {
     if (!flag.current) return;
@@ -149,7 +198,7 @@ function TempleFlag() {
   });
 
   return (
-    <group position={[x, ground + y, z]}>
+    <group position={top}>
       <mesh position={[0, 0.8, 0]}>
         <cylinderGeometry args={[0.03, 0.03, 1.6, 6]} />
         <meshStandardMaterial color={PALETTE.darkWood} />

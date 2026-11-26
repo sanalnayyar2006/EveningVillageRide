@@ -2,24 +2,41 @@
 
 import { useMemo } from "react";
 import { BufferAttribute, BufferGeometry } from "three";
-import { POND, RIVER, WORLD } from "./data/layout";
-import { riverCenterZ } from "./terrain";
+import { POND, STREAM } from "./data/layout";
+import { POND_WATER_Y, streamWaterY } from "./terrain";
 import { WORLD_MATERIALS } from "./worldMaterials";
 
 /** The water reaches a little under the banks so no gap shows at the edge. */
 const OVERLAP = 1.2;
+/** Sample spacing along the stream, so the water steps down the hill smoothly. */
+const STEP = 3;
 
-/** A flat ribbon that follows the river's bends across the whole map. */
-function buildRiver(): BufferGeometry {
+/** A ribbon of water along the stream's course, dropping with the hillside. */
+function buildStream(): BufferGeometry {
   const positions: number[] = [];
-  const half = RIVER.halfWidth + OVERLAP;
-  const step = 4;
-  for (let x = -WORLD.extent; x < WORLD.extent; x += step) {
-    const z0 = riverCenterZ(x);
-    const z1 = riverCenterZ(x + step);
-    const y = RIVER.waterY;
-    positions.push(x, y, z0 - half, x, y, z0 + half, x + step, y, z1 + half);
-    positions.push(x, y, z0 - half, x + step, y, z1 + half, x + step, y, z1 - half);
+  const half = STREAM.waterHalfWidth + OVERLAP * 0.5;
+  const points = STREAM.points;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const [ax, az] = points[i]!;
+    const [bx, bz] = points[i + 1]!;
+    const length = Math.hypot(bx - ax, bz - az);
+    const sideX = (-(bz - az) / length) * half;
+    const sideZ = ((bx - ax) / length) * half;
+    const steps = Math.ceil(length / STEP);
+    for (let s = 0; s < steps; s++) {
+      const x0 = ax + ((bx - ax) * s) / steps;
+      const z0 = az + ((bz - az) * s) / steps;
+      const x1 = ax + ((bx - ax) * (s + 1)) / steps;
+      const z1 = az + ((bz - az) * (s + 1)) / steps;
+      const y0 = streamWaterY(x0, z0);
+      const y1 = streamWaterY(x1, z1);
+      const left0 = [x0 - sideX, y0, z0 - sideZ];
+      const right0 = [x0 + sideX, y0, z0 + sideZ];
+      const left1 = [x1 - sideX, y1, z1 - sideZ];
+      const right1 = [x1 + sideX, y1, z1 + sideZ];
+      positions.push(...left0, ...right0, ...right1, ...left0, ...right1, ...left1);
+    }
   }
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new BufferAttribute(new Float32Array(positions), 3));
@@ -27,14 +44,14 @@ function buildRiver(): BufferGeometry {
   return geometry;
 }
 
-/** River and pond surfaces. Flat for now; Phase 5 adds movement and reflections. */
+/** Stream and pond surfaces. Flat for now; Phase 5 adds movement and reflections. */
 export function Water() {
-  const river = useMemo(() => buildRiver(), []);
+  const stream = useMemo(() => buildStream(), []);
   return (
     <>
-      <mesh geometry={river} material={WORLD_MATERIALS.water} />
+      <mesh geometry={stream} material={WORLD_MATERIALS.water} />
       <mesh
-        position={[POND.x, POND.waterY, POND.z]}
+        position={[POND.x, POND_WATER_Y, POND.z]}
         rotation-x={-Math.PI / 2}
         material={WORLD_MATERIALS.water}
       >

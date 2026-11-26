@@ -3,14 +3,16 @@ import type { GeometryBatch } from "../batch";
 import { FIELDS } from "../data/layout";
 import { BULLOCK_CART, HAYSTACKS, SCARECROWS } from "../data/structures";
 import { PALETTE } from "../worldMaterials";
-import { heightAt, roadEdgeDistance } from "../terrain";
+import type { Point } from "../data/mapSource";
+import { heightAt, isInWater, roadEdgeDistance } from "../terrain";
 import { onGround } from "../scenery/place";
 
-const FENCE_SPACING = 2.6;
+/** Length of one stretch of wall; short enough to follow the ground. */
+const WALL_STEP = 2.4;
 
-/** Fences around the fields, haystacks, scarecrows and a resting bullock cart. Crops are in Crops.tsx. */
+/** Dry-stone walls along the field edges, haystacks, scarecrows and a resting bullock cart. Crops are in Crops.tsx. */
 export function buildFields(b: GeometryBatch) {
-  for (const field of FIELDS) buildFence(b, field.min, field.max);
+  for (const field of FIELDS) buildWall(b, field.polygon);
 
   for (const stack of HAYSTACKS) {
     onGround(b, stack.x, stack.z, 0, () => {
@@ -33,31 +35,35 @@ export function buildFields(b: GeometryBatch) {
   buildBullockCart(b);
 }
 
-/** Posts every few metres along the field edge with a rail between them, skipping roads. */
-function buildFence(b: GeometryBatch, min: [number, number], max: [number, number]) {
-  const corners: [number, number][] = [
-    [min[0], min[1]],
-    [max[0], min[1]],
-    [max[0], max[1]],
-    [min[0], max[1]],
-  ];
-  corners.forEach(([ax, az], i) => {
-    const [bx, bz] = corners[(i + 1) % 4] ?? corners[0]!;
+/** A knee-high stone wall around a field, broken wherever a road or water crosses it. */
+function buildWall(b: GeometryBatch, polygon: Point[]) {
+  polygon.forEach(([ax, az], i) => {
+    const [bx, bz] = polygon[(i + 1) % polygon.length]!;
     const length = Math.hypot(bx - ax, bz - az);
-    const posts = Math.max(1, Math.round(length / FENCE_SPACING));
-    let previous: [number, number, number] | null = null;
-    for (let p = 0; p <= posts; p++) {
-      const x = ax + ((bx - ax) * p) / posts;
-      const z = az + ((bz - az) * p) / posts;
-      const y = heightAt(x, z);
-      if (roadEdgeDistance(x, z) < 0.6 || y < -0.1) {
-        previous = null;
-        continue;
-      }
-      b.box([0.1, 1, 0.1], [x, y + 0.5, z], PALETTE.wood);
-      if (previous)
-        b.beam([previous[0], previous[1] + 0.7, previous[2]], [x, y + 0.7, z], 0.05, "#8a6844");
-      previous = [x, y, z];
+    const pieces = Math.max(1, Math.round(length / WALL_STEP));
+    for (let p = 0; p < pieces; p++) {
+      const x0 = ax + ((bx - ax) * p) / pieces;
+      const z0 = az + ((bz - az) * p) / pieces;
+      const x1 = ax + ((bx - ax) * (p + 1)) / pieces;
+      const z1 = az + ((bz - az) * (p + 1)) / pieces;
+      const mx = (x0 + x1) / 2;
+      const mz = (z0 + z1) / 2;
+      if (roadEdgeDistance(mx, mz) < 0.8 || isInWater(mx, mz)) continue;
+      const y0 = heightAt(x0, z0);
+      const y1 = heightAt(x1, z1);
+      // Walls hold up the terrace edge, so they reach down to the lower side.
+      b.beam(
+        [x0, Math.min(y0, y1) + 0.15, z0],
+        [x1, Math.min(y0, y1) + 0.15, z1],
+        0.32,
+        PALETTE.darkStone,
+      );
+      b.beam(
+        [x0, Math.max(y0, y1) + 0.35, z0],
+        [x1, Math.max(y0, y1) + 0.35, z1],
+        0.26,
+        PALETTE.stone,
+      );
     }
   });
 }

@@ -9,8 +9,7 @@ const VERANDA_DEPTH = 2.2;
 /** A government primary school: cream walls, a blue dado, a pillared veranda and a flag pole. */
 export function buildSchool(b: GeometryBatch) {
   const { w, d, h } = SCHOOL;
-  // The front faces south, down the lane.
-  onGround(b, SCHOOL.x, SCHOOL.z, Math.PI, () => {
+  onGround(b, SCHOOL.x, SCHOOL.z, SCHOOL.rot, () => {
     b.box(
       [w + 0.4, PLINTH + 1, d + VERANDA_DEPTH * 2],
       [0, PLINTH / 2 - 0.5, VERANDA_DEPTH / 2],
@@ -64,7 +63,7 @@ export function buildSchool(b: GeometryBatch) {
 /** A bare strip of earth with stumps at both ends, where the evening match is played. */
 function buildCricketPitch(b: GeometryBatch) {
   const { length } = CRICKET_PITCH;
-  onGround(b, CRICKET_PITCH.x, CRICKET_PITCH.z, Math.PI / 2, () => {
+  onGround(b, CRICKET_PITCH.x, CRICKET_PITCH.z, CRICKET_PITCH.rot, () => {
     b.box([2.6, 0.04, length + 2], [0, 0.02, 0], "#b99668");
     for (const end of [-length / 2, length / 2]) {
       for (const x of [-0.12, 0, 0.12]) b.cylinder(0.02, 0.02, 0.72, [x, 0.36, end], "#e9dcc0", 5);
@@ -73,9 +72,9 @@ function buildCricketPitch(b: GeometryBatch) {
   });
 }
 
-/** Sign board above the doors, in world space; the school faces south (−Z). */
-export const SCHOOL_SIGN = {
-  x: SCHOOL.x,
-  z: SCHOOL.z - SCHOOL.d / 2 - 0.08,
-  y: PLINTH + SCHOOL.h - 0.55,
-} as const;
+/** Sign board above the doors, in the school's local space. */
+export const SCHOOL_SIGN: [number, number, number] = [
+  0,
+  PLINTH + SCHOOL.h - 0.55,
+  SCHOOL.d / 2 + 0.08,
+];

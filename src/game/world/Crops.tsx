@@ -4,12 +4,13 @@ import { useEffect, useMemo } from "react";
 import { Color, type BufferGeometry } from "three";
 import { mulberry32 } from "@/utils/math";
 import { GeometryBatch } from "./batch";
-import { FIELDS, type FieldPatch } from "./data/layout";
+import { boundsOf, inPolygon } from "./data/geometry";
+import { FIELDS, type Field } from "./data/layout";
 import { createInstances, type InstanceSpec } from "./instancing";
 import { heightAt, roadEdgeDistance } from "./terrain";
 import { WORLD_MATERIALS } from "./worldMaterials";
 
-type Crop = FieldPatch["crop"];
+type Crop = "mustard" | "wheat" | "paddy";
 
 /** Row and plant spacing in metres. */
 const SPACING = { across: 1.3, along: 0.9 };
@@ -56,16 +57,20 @@ function shape(crop: Crop): BufferGeometry {
   return batch.build()!;
 }
 
-/** Plants in neat rows, skipping any spot that's under water or on a path. */
-function plantField(field: FieldPatch, seed: number): InstanceSpec[] {
+/** Plants in neat rows inside the field's outline, skipping any spot on a path. */
+function plantField(field: Field, seed: number): InstanceSpec[] {
   const random = mulberry32(seed);
   const plants: InstanceSpec[] = [];
-  for (let x = field.min[0] + 0.6; x < field.max[0] - 0.4; x += SPACING.across) {
-    for (let z = field.min[1] + 0.5; z < field.max[1] - 0.4; z += SPACING.along) {
+  const { minX, maxX, minZ, maxZ } = boundsOf(field.polygon);
+  for (let x = minX + 0.6; x < maxX - 0.4; x += SPACING.across) {
+    for (let z = minZ + 0.5; z < maxZ - 0.4; z += SPACING.along) {
       const px = x + (random() - 0.5) * 0.25;
       const pz = z + (random() - 0.5) * 0.25;
+      // Keep a small margin inside the wall.
+      if (!inPolygon(px, pz, field.polygon) || !inPolygon(px + 0.8, pz + 0.8, field.polygon))
+        continue;
+      if (!inPolygon(px - 0.8, pz - 0.8, field.polygon) || roadEdgeDistance(px, pz) < 0.4) continue;
       const y = heightAt(px, pz);
-      if (y < -0.05 || roadEdgeDistance(px, pz) < 0.4) continue;
       plants.push({
         x: px,
         y,
@@ -84,7 +89,7 @@ export function Crops() {
   const meshes = useMemo(() => {
     const crops: Crop[] = ["mustard", "wheat", "paddy"];
     return crops.map((crop, cropIndex) => {
-      const fields = FIELDS.filter((f) => f.crop === crop);
+      const fields = FIELDS.filter((f) => f.use === crop);
       const plants = fields.flatMap((field, i) => plantField(field, cropIndex * 100 + i));
       return createInstances(shape(crop), WORLD_MATERIALS.instanced, plants, false);
     });

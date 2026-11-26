@@ -1,5 +1,6 @@
 import type { WebGLRenderer } from "three";
 import { useBikeStore } from "@/store/bikeStore";
+import { ambient } from "@/game/ambient/ambientState";
 import { useGalleryStore } from "@/store/galleryStore";
 import { useGameStore } from "@/store/gameStore";
 import { usePhotoStore } from "@/store/photoStore";
@@ -24,6 +25,8 @@ export function installDebugHandle(): void {
     game: useGameStore,
     photo: usePhotoStore,
     gallery: useGalleryStore,
+    /** Mutable evening state; e.g. `__evr.ambient.dayProgress = 0.9` jumps to dusk. */
+    ambient,
     renderStats: () =>
       renderer && {
         drawCalls: renderer.info.render.calls,

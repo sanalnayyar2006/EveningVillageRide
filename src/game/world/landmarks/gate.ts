@@ -5,7 +5,7 @@ import { onGround } from "../scenery/place";
 
 /** Two painted pillars joined by a beam that carries the welcome sign. */
 export function buildGate(b: GeometryBatch) {
-  onGround(b, 0, GATE.z, 0, () => {
+  onGround(b, GATE.x, GATE.z, GATE.rot, () => {
     for (const side of [-1, 1]) {
       const x = side * GATE.halfSpan;
       b.box([GATE.pillar + 0.2, 0.5, GATE.pillar + 0.2], [x, 0.25, 0], PALETTE.stone);
@@ -21,5 +21,5 @@ export function buildGate(b: GeometryBatch) {
   });
 }
 
-/** Where the gate's signs go (front faces the arriving rider). */
-export const GATE_SIGN = { y: GATE.height - 0.65, z: GATE.z, width: 6.2, height: 0.7 } as const;
+/** Height of the sign boards on the gate's beam, front and back. */
+export const GATE_SIGN_Y = GATE.height - 0.65;

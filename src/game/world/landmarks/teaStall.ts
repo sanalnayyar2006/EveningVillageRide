@@ -9,8 +9,7 @@ const JAR_COLOURS = ["#e3b04b", "#d96a3b", "#9bbf5a", "#e3b04b"];
 /** A small roadside chai stall: tin roof, wooden counter, kettle on the stove, jars of biscuits. */
 export function buildTeaStall(b: GeometryBatch) {
   const { w, d, h } = TEA_STALL;
-  // Facing -X, towards the main road.
-  onGround(b, TEA_STALL.x, TEA_STALL.z, -Math.PI / 2, () => {
+  onGround(b, TEA_STALL.x, TEA_STALL.z, TEA_STALL.rot, () => {
     b.box([w, 0.2, d], [0, 0.1, 0], PALETTE.stone);
     b.box([w, h, 0.12], [0, h / 2, -d / 2], "#e8d9b5");
     b.box([0.12, h, d], [-w / 2, h / 2, 0], "#e8d9b5");
@@ -37,9 +36,9 @@ export function buildTeaStall(b: GeometryBatch) {
   });
 }
 
-/** Sign above the counter, in world space; the stall faces -X. */
-export const TEA_STALL_SIGN = {
-  x: TEA_STALL.x - TEA_STALL.d / 2 - 0.05,
-  z: TEA_STALL.z,
-  y: TEA_STALL.h - 0.35,
-} as const;
+/** Sign above the counter, in the stall's local space. */
+export const TEA_STALL_SIGN: [number, number, number] = [
+  0,
+  TEA_STALL.h - 0.35,
+  TEA_STALL.d / 2 + 0.05,
+];

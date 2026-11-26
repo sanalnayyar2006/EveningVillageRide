@@ -16,8 +16,7 @@ const SPIRE_TIERS = [
 /** A whitewashed temple with a stepped saffron spire, a pillared porch and lamps along the plinth. */
 export function buildTemple(b: GeometryBatch) {
   const { plinth, sanctum } = TEMPLE;
-  // The front faces south, towards the lane.
-  onGround(b, TEMPLE.x, TEMPLE.z, 0, () => {
+  onGround(b, TEMPLE.x, TEMPLE.z, TEMPLE.rot, () => {
     b.box([plinth.w, plinth.h + 1, plinth.d], [0, plinth.h / 2 - 0.5, 0], PALETTE.stone);
     b.box([plinth.w + 0.1, 0.08, plinth.d + 0.1], [0, plinth.h, 0], PALETTE.whitewash);
     for (let step = 0; step < 3; step++) {
@@ -88,17 +87,17 @@ export function buildTemple(b: GeometryBatch) {
   buildBellArch(b);
 }
 
-/** Top of the spire relative to the ground, for the flag pole. */
-export const TEMPLE_SPIRE_TOP = {
-  x: TEMPLE.x,
-  y: TEMPLE.plinth.h + TEMPLE.sanctum.h + SPIRE_TIERS.reduce((sum, [, h]) => sum + h, 0) + 1.5,
-  z: TEMPLE.z + SANCTUM_Z,
-} as const;
+/** Top of the spire, in the temple's local space, for the flag pole. */
+export const TEMPLE_SPIRE_TOP: [number, number, number] = [
+  0,
+  TEMPLE.plinth.h + TEMPLE.sanctum.h + SPIRE_TIERS.reduce((sum, [, h]) => sum + h, 0) + 1.5,
+  SANCTUM_Z,
+];
 
 /** The arch over the lane where visitors ring the bell on the way in. */
 function buildBellArch(b: GeometryBatch) {
   const { height } = TEMPLE_BELL;
-  onGround(b, TEMPLE_BELL.x, TEMPLE_BELL.z, 0, () => {
+  onGround(b, TEMPLE_BELL.x, TEMPLE_BELL.z, TEMPLE_BELL.rot, () => {
     for (const x of [-1.2, 1.2]) {
       b.cylinder(0.11, 0.13, height, [x, height / 2, 0], PALETTE.vermilion, 8);
     }

@@ -1,4 +1,5 @@
 import { MeshStandardMaterial } from "three";
+import { addWindSway } from "@/game/ambient/wind";
 
 // Shared materials for the village. Most scenery is vertex-coloured, so one material covers it.
 
@@ -26,6 +27,9 @@ export const WORLD_MATERIALS = {
     polygonOffsetFactor: -2,
   }),
 } as const;
+
+// Trees, grass, flowers and crops all sway in the evening breeze.
+addWindSway(WORLD_MATERIALS.instanced);
 
 /** The village palette, so the same "whitewash" or "saffron" is used everywhere. */
 export const PALETTE = {

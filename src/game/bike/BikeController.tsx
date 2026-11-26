@@ -7,7 +7,7 @@ import { Euler, Quaternion } from "three";
 import { events } from "@/game/core/events";
 import { FRAME_ORDER, MAX_DT } from "@/game/core/frameOrder";
 import { input } from "@/game/core/input/InputManager";
-import { groundHeight, groundSlope, RIDE_RADIUS } from "@/game/world/groundQueries";
+import { clampToRideArea, groundHeight, groundSlope } from "@/game/world/groundQueries";
 import { damp } from "@/utils/math";
 import { BIKE_SPAWN, useBikeStore } from "@/store/bikeStore";
 import { usePlayerStore } from "@/store/playerStore";
@@ -42,13 +42,6 @@ function readControls(): BikeInput {
     back: input.isDown("back") ? 1 : 0,
     steer: input.axis("right", "left"),
   };
-}
-
-/** Keeps a point inside the rideable circle, letting the bike slide along its edge. */
-function clampToRideArea(x: number, z: number): [number, number] {
-  const r = Math.hypot(x, z);
-  if (r <= RIDE_RADIUS) return [x, z];
-  return [(x * RIDE_RADIUS) / r, (z * RIDE_RADIUS) / r];
 }
 
 const rotation = new Quaternion();
@@ -159,7 +152,11 @@ export function BikeController() {
       ref={body}
       type="kinematicPosition"
       colliders={false}
-      position={[BIKE_SPAWN.x, COLLIDER.centerHeight, BIKE_SPAWN.z]}
+      position={[
+        BIKE_SPAWN.x,
+        groundHeight(BIKE_SPAWN.x, BIKE_SPAWN.z) + COLLIDER.centerHeight,
+        BIKE_SPAWN.z,
+      ]}
       userData={{ tag: BODY_TAGS.bike }}
     >
       <CapsuleCollider args={[COLLIDER.halfLength, COLLIDER.radius]} />

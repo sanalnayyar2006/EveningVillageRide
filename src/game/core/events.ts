@@ -7,6 +7,17 @@ import type { Vec3Tuple } from "@/types/game";
 export interface GameEvents {
   "bike:bell": { position: Vec3Tuple };
   "photo:taken": { id: string };
+  /** Creature sounds and reactions, all positioned in the world. */
+  "life:moo": { position: Vec3Tuple };
+  "life:bark": { position: Vec3Tuple };
+  "life:bleat": { position: Vec3Tuple };
+  "life:birdsFlush": { position: Vec3Tuple };
+  "life:cheer": { position: Vec3Tuple };
+  /** Ambient happenings chosen by the AmbientDirector. */
+  "ambient:templeBell": { position: Vec3Tuple };
+  "ambient:trainHorn": { position: Vec3Tuple };
+  "ambient:gust": { seconds: number };
+  "ambient:flyover": Record<string, never>;
 }
 
 type Handler<T> = (payload: T) => void;

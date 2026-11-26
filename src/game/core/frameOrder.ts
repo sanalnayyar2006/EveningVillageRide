@@ -4,6 +4,8 @@
  */
 export const FRAME_ORDER = {
   player: -50,
+  /** Villagers and animals move before the bike, so it collides with where they are now. */
+  life: -45,
   bike: -40,
   camera: -30,
   /** Blends from the ride camera into first person, so it runs after it. */

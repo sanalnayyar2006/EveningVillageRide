@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { SPAWN } from "@/game/world/data/layout";
+import { heightAt } from "@/game/world/terrain";
 
 /**
  * The bike's state for the current frame. The object is mutated in place every
@@ -42,13 +44,13 @@ interface BikeStore {
   teleportTo: (x: number, z: number, heading: number) => void;
 }
 
-/** Just outside the village gate, facing north up the main road. */
-export const BIKE_SPAWN = { x: 0, z: 104, heading: Math.PI } as const;
+/** On the highway east of the village, riding towards the village gate. */
+export const BIKE_SPAWN = SPAWN;
 
 export const useBikeStore = create<BikeStore>()((set, get) => ({
   telemetry: {
     x: BIKE_SPAWN.x,
-    y: 0,
+    y: heightAt(BIKE_SPAWN.x, BIKE_SPAWN.z),
     z: BIKE_SPAWN.z,
     heading: BIKE_SPAWN.heading,
     speed: 0,

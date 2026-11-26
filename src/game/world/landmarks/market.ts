@@ -6,15 +6,13 @@ import { onGround } from "../scenery/place";
 
 const PRODUCE = ["#f08c28", "#d23c28", "#5f9a35", "#e8c840", "#9b4a6a", "#f2d7a0"];
 
-/** Canopied stalls lining the east road, piled with fruit and vegetables, hung with marigolds. */
+/** Canopied stalls along the highway verge, piled with fruit and vegetables, hung with marigolds. */
 export function buildMarket(b: GeometryBatch) {
   const random = mulberry32(55);
   const { w, d } = STALL_SIZE;
 
   for (const stall of MARKET_STALLS) {
-    // Stalls on the north side face south onto the road, and vice versa.
-    const facing = stall.z < 0 ? 0 : Math.PI;
-    onGround(b, stall.x, stall.z, facing, () => {
+    onGround(b, stall.x, stall.z, stall.rot, () => {
       for (const [x, z, height] of [
         [-w / 2, d / 2, 2.3],
         [w / 2, d / 2, 2.3],

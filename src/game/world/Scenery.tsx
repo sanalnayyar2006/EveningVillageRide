@@ -4,14 +4,14 @@ import { useEffect, useMemo } from "react";
 import type { BufferGeometry } from "three";
 import { GeometryBatch } from "./batch";
 import { buildBanyan } from "./landmarks/banyan";
-import { buildBridge } from "./landmarks/bridge";
 import { buildBusStop } from "./landmarks/busStop";
 import { buildFields } from "./landmarks/fields";
 import { buildGate } from "./landmarks/gate";
+import { buildHospital } from "./landmarks/hospital";
 import { buildMarket } from "./landmarks/market";
 import { buildPond } from "./landmarks/pond";
-import { buildRailwayCrossing } from "./landmarks/railwayCrossing";
 import { buildSchool } from "./landmarks/school";
+import { buildSubstation } from "./landmarks/substation";
 import { buildTeaStall } from "./landmarks/teaStall";
 import { buildTemple } from "./landmarks/temple";
 import { buildWaterTank } from "./landmarks/waterTank";
@@ -34,8 +34,8 @@ const BUILDERS: Record<string, (b: GeometryBatch) => void> = {
   pond: buildPond,
   school: buildSchool,
   waterTank: buildWaterTank,
-  railway: buildRailwayCrossing,
-  bridge: buildBridge,
+  hospital: buildHospital,
+  substation: buildSubstation,
   fields: buildFields,
   props: buildProps,
 };

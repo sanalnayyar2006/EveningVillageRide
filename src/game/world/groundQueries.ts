@@ -1,8 +1,11 @@
 import { WORLD } from "./data/layout";
 import { heightAt, slopeAt } from "./terrain";
 
-/** The bike can't ride further than this from the village centre (metres). */
-export const RIDE_RADIUS = WORLD.rideRadius;
-
 export const groundHeight = heightAt;
 export const groundSlope = slopeAt;
+
+/** Keeps a point inside the rideable area, letting the bike slide along its edge. */
+export function clampToRideArea(x: number, z: number): [number, number] {
+  const { minX, maxX, minZ, maxZ } = WORLD.rideBounds;
+  return [Math.min(maxX, Math.max(minX, x)), Math.min(maxZ, Math.max(minZ, z))];
+}

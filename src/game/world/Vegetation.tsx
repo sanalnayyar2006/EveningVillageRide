@@ -24,43 +24,9 @@ function tallTree(b: GeometryBatch) {
   b.blob(0.9, [0.2, 6.4, 0.1], PALETTE.leaf, [1, 1.3, 1]);
 }
 
-function palmTree(b: GeometryBatch) {
-  // A trunk that leans further with height.
-  const segments = 6;
-  let x = 0;
-  let y = 0;
-  for (let i = 0; i < segments; i++) {
-    const lean = 0.06 + i * 0.035;
-    const height = 1.1;
-    const radius = 0.2 - i * 0.012;
-    b.cylinder(
-      radius - 0.01,
-      radius,
-      height,
-      [x + Math.sin(lean) * height * 0.5, y + height / 2, 0],
-      "#8a7358",
-      7,
-      [0, 0, -lean],
-    );
-    x += Math.sin(lean) * height;
-    y += Math.cos(lean) * height;
-  }
-  for (let i = 0; i < 9; i++) {
-    const angle = (i / 9) * Math.PI * 2;
-    b.group([x, y, 0], angle, () => {
-      b.box([0.32, 0.04, 2.6], [0, -0.35, 1.2], i % 2 ? "#5f8a33" : "#4f7a2b", [0.45, 0, 0]);
-    });
-  }
-  for (let i = 0; i < 3; i++) {
-    const angle = (i / 3) * Math.PI * 2;
-    b.sphere(0.13, [x + Math.cos(angle) * 0.22, y - 0.2, Math.sin(angle) * 0.22], "#6b4a2a");
-  }
-}
-
 const TREE_BUILDERS: Record<TreeKind, (b: GeometryBatch) => void> = {
   round: roundTree,
   tall: tallTree,
-  palm: palmTree,
 };
 
 function buildShape(build: (b: GeometryBatch) => void): BufferGeometry {

@@ -1,11 +1,5 @@
 import type { GeometryBatch } from "../batch";
-import {
-  CROSS_ROAD_LAMPS,
-  POLE_HEIGHT,
-  POWER_POLES,
-  STREET_LAMPS,
-  WIRE_OFFSETS,
-} from "../data/props";
+import { POLE_HEIGHT, POWER_POLES, STREET_LAMPS, WIRE_OFFSETS } from "../data/props";
 import { BENCHES, HAND_PUMP, WELL } from "../data/structures";
 import { PALETTE } from "../worldMaterials";
 import { onGround } from "./place";
@@ -35,14 +29,15 @@ function handPump(b: GeometryBatch) {
   b.beam([0, 1.05, 0], [-0.7, 1.25, 0], 0.05, "#3b5f78");
 }
 
-/** A street lamp whose arm reaches `reach` metres along local +X. */
-function streetLamp(b: GeometryBatch, reach: number) {
+/** A street lamp whose arm reaches 1.1 m along local +Z, over the road. */
+function streetLamp(b: GeometryBatch) {
   b.cylinder(0.06, 0.09, 4.4, [0, 2.2, 0], PALETTE.iron, 8);
-  b.beam([0, 4.2, 0], [reach, 4.35, 0], 0.06, PALETTE.iron);
-  b.box([0.35, 0.12, 0.25], [reach, 4.32, 0], PALETTE.iron);
-  b.glowing(() => b.sphere(0.12, [reach, 4.2, 0], "#ffffff"));
+  b.beam([0, 4.2, 0], [0, 4.35, 1.1], 0.06, PALETTE.iron);
+  b.box([0.25, 0.12, 0.35], [0, 4.32, 1.1], PALETTE.iron);
+  b.glowing(() => b.sphere(0.12, [0, 4.2, 1.1], "#ffffff"));
 }
 
+/** A concrete pole; the crossbar runs along local X, across the line. */
 function powerPole(b: GeometryBatch) {
   b.box([0.22, POLE_HEIGHT, 0.22], [0, POLE_HEIGHT / 2, 0], "#b7b0a2");
   b.box([1.4, 0.1, 0.12], [0, POLE_HEIGHT - 0.3, 0], PALETTE.iron);
@@ -52,14 +47,8 @@ function powerPole(b: GeometryBatch) {
 
 export function buildProps(b: GeometryBatch) {
   for (const spot of BENCHES) onGround(b, spot.x, spot.z, spot.rot, () => bench(b));
-  onGround(b, WELL.x, WELL.z, 0.3, () => well(b));
-  onGround(b, HAND_PUMP.x, HAND_PUMP.z, 0.8, () => handPump(b));
-
-  for (const [x, z, side] of STREET_LAMPS) onGround(b, x, z, 0, () => streetLamp(b, side * 1.1));
-  for (const [x, z] of CROSS_ROAD_LAMPS) {
-    // Arm points across the road: towards +Z for lamps on the north side, -Z for the south.
-    onGround(b, x, z, z < 0 ? -Math.PI / 2 : Math.PI / 2, () => streetLamp(b, 1.1));
-  }
-  // The crossbar runs east–west, across the road.
-  for (const [x, z] of POWER_POLES) onGround(b, x, z, 0, () => powerPole(b));
+  onGround(b, WELL.x, WELL.z, WELL.rot, () => well(b));
+  onGround(b, HAND_PUMP.x, HAND_PUMP.z, HAND_PUMP.rot, () => handPump(b));
+  for (const lamp of STREET_LAMPS) onGround(b, lamp.x, lamp.z, lamp.rot, () => streetLamp(b));
+  for (const pole of POWER_POLES) onGround(b, pole.x, pole.z, pole.rot, () => powerPole(b));
 }
