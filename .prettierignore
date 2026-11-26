@@ -1,4 +1,6 @@
 .next
+.next.nosync
 node_modules
+node_modules.nosync
 pnpm-lock.yaml
 RULES

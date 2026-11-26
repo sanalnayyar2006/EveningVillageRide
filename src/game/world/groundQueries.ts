@@ -1,8 +1,11 @@
-// Flat ground for now. The village terrain (Phase 2) plugs in behind these same functions.
+import { WORLD } from "./data/layout";
+import { heightAt, slopeAt } from "./terrain";
 
-/** The bike can't ride further than this from the world origin (metres). */
-export const RIDE_RADIUS = 150;
+export const groundHeight = heightAt;
+export const groundSlope = slopeAt;
 
-export function groundHeight(_x: number, _z: number): number {
-  return 0;
+/** Keeps a point inside the rideable area, letting the bike slide along its edge. */
+export function clampToRideArea(x: number, z: number): [number, number] {
+  const { minX, maxX, minZ, maxZ } = WORLD.rideBounds;
+  return [Math.min(maxX, Math.max(minX, x)), Math.min(maxZ, Math.max(minZ, z))];
 }

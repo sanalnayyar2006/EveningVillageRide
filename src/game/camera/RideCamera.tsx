@@ -4,7 +4,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useRapier } from "@react-three/rapier";
 import { useMemo, useRef } from "react";
 import { PerspectiveCamera, Vector3 } from "three";
-import { BIKE_BODY_TAG, BIKE_CONFIG } from "@/game/bike/bikeConfig";
+import { BIKE_CONFIG } from "@/game/bike/bikeConfig";
 import { FRAME_ORDER, MAX_DT } from "@/game/core/frameOrder";
 import { input } from "@/game/core/input/InputManager";
 import { groundHeight } from "@/game/world/groundQueries";
@@ -13,6 +13,7 @@ import { usePlayerStore } from "@/store/playerStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { angleDelta, clamp, damp } from "@/utils/math";
 import { RIDE_CAMERA as CAM } from "./cameraConfig";
+import { castCameraRay, type RapierRay, type RapierWorld } from "./cameraRay";
 
 interface Orbit {
   /** Where the camera currently sits around the bike (lags behind `heading + yawOffset`). */
@@ -25,9 +26,6 @@ interface Orbit {
   /** Actual distance this frame, shortened when scenery is in the way. */
   distance: number;
 }
-
-type RapierWorld = ReturnType<typeof useRapier>["world"];
-type RapierRay = InstanceType<ReturnType<typeof useRapier>["rapier"]["Ray"]>;
 
 function applyLookInput(orbit: Orbit) {
   const { dx, dy } = input.consumeLook();
@@ -64,22 +62,9 @@ function unobstructedDistance(
   direction: Vector3,
   wanted: number,
 ): number {
-  ray.origin = { x: from.x, y: from.y, z: from.z };
-  ray.dir = { x: direction.x, y: direction.y, z: direction.z };
-  const hit = world.castRay(
-    ray,
-    wanted + CAM.collisionPadding,
-    true,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    (collider) =>
-      !collider.isSensor() &&
-      (collider.parent()?.userData as { tag?: string } | undefined)?.tag !== BIKE_BODY_TAG,
-  );
-  if (!hit) return wanted;
-  return Math.max(CAM.minCollisionDistance, hit.timeOfImpact - CAM.collisionPadding);
+  const hit = castCameraRay(world, ray, from, direction, wanted + CAM.collisionPadding);
+  if (hit === null) return wanted;
+  return Math.max(CAM.minCollisionDistance, hit - CAM.collisionPadding);
 }
 
 /**
@@ -90,6 +75,10 @@ export function RideCamera() {
   const camera = useThree((state) => state.camera);
   const { world, rapier } = useRapier();
   const orbit = useRef<Orbit | null>(null);
+  const seenTeleports = useRef(0);
+  // The camera's own smoothed pose. Kept separate from `camera` because the
+  // photo camera may blend over it later in the frame.
+  const smoothed = useMemo(() => ({ position: new Vector3(), fov: CAM.baseFov }), []);
   const ray = useMemo(() => new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }), [rapier]);
   const vec = useMemo(
     () => ({
@@ -103,7 +92,12 @@ export function RideCamera() {
 
   useFrame((_, frameDelta) => {
     const dt = Math.min(frameDelta, MAX_DT);
-    const bike = useBikeStore.getState().telemetry;
+    const { telemetry: bike, teleportCount } = useBikeStore.getState();
+    // After a teleport, start over behind the bike instead of gliding across the map.
+    if (teleportCount !== seenTeleports.current) {
+      seenTeleports.current = teleportCount;
+      orbit.current = null;
+    }
     const firstFrame = orbit.current === null;
     orbit.current ??= {
       yaw: bike.heading,
@@ -114,12 +108,8 @@ export function RideCamera() {
     };
     const view = orbit.current;
 
-    if (usePlayerStore.getState().state === "cycling") {
-      applyLookInput(view);
-    } else {
-      input.consumeLook();
-      input.consumeWheel();
-    }
+    // Off the bike (phone out, album open) the look input belongs to someone else.
+    if (usePlayerStore.getState().state === "cycling") applyLookInput(view);
     recenter(view, bike, dt);
 
     // The orbit trails the bike's heading; this lag is what makes turns feel smooth.
@@ -152,8 +142,9 @@ export function RideCamera() {
       vec.position.y,
       groundHeight(vec.position.x, vec.position.z) + CAM.groundClearance,
     );
-    if (firstFrame) camera.position.copy(vec.position);
-    else camera.position.lerp(vec.position, damp(CAM.positionFollow, dt));
+    if (firstFrame) smoothed.position.copy(vec.position);
+    else smoothed.position.lerp(vec.position, damp(CAM.positionFollow, dt));
+    camera.position.copy(smoothed.position);
 
     const lead = bike.speed * CAM.lookAhead;
     vec.lookAt.set(
@@ -163,13 +154,12 @@ export function RideCamera() {
     );
     camera.lookAt(vec.lookAt);
 
-    if (camera instanceof PerspectiveCamera) {
-      const speedRatio = clamp(bike.speed / BIKE_CONFIG.maxSpeed, 0, 1);
-      const fov = CAM.baseFov + CAM.speedFov * speedRatio;
-      if (Math.abs(camera.fov - fov) > 0.01) {
-        camera.fov += (fov - camera.fov) * damp(CAM.fovResponse, dt);
-        camera.updateProjectionMatrix();
-      }
+    const speedRatio = clamp(bike.speed / BIKE_CONFIG.maxSpeed, 0, 1);
+    const fov = CAM.baseFov + CAM.speedFov * speedRatio;
+    smoothed.fov += (fov - smoothed.fov) * damp(CAM.fovResponse, dt);
+    if (camera instanceof PerspectiveCamera && Math.abs(camera.fov - smoothed.fov) > 0.001) {
+      camera.fov = smoothed.fov;
+      camera.updateProjectionMatrix();
     }
   }, FRAME_ORDER.camera);
 

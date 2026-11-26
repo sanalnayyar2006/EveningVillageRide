@@ -24,6 +24,8 @@ class InputManager {
   private lastX = 0;
   private lastY = 0;
   private lastLookAt = 0;
+  /** Presses released without dragging this frame. */
+  private clicks = 0;
 
   /** Keyboard is read window-wide; drag-to-look only on `surface`. Returns a detach function. */
   attach(surface: HTMLElement): () => void {
@@ -63,6 +65,7 @@ class InputManager {
     const onPointerUp = (e: PointerEvent) => {
       if (this.pointerId !== e.pointerId) return;
       this.pointerId = null;
+      if (this.dragDistance < DRAG_THRESHOLD) this.clicks += 1;
       if (surface.hasPointerCapture(e.pointerId)) surface.releasePointerCapture(e.pointerId);
       surface.style.cursor = "grab";
     };
@@ -129,6 +132,11 @@ class InputManager {
     return performance.now() - this.lastLookAt;
   }
 
+  /** True on the frame a left-button press was released without dragging. */
+  wasClicked(): boolean {
+    return this.clicks > 0;
+  }
+
   get isDragging(): boolean {
     return this.pointerId !== null && this.dragDistance >= DRAG_THRESHOLD;
   }
@@ -136,6 +144,7 @@ class InputManager {
   /** Call once at the very end of every frame. */
   endFrame(): void {
     this.pressed.clear();
+    this.clicks = 0;
   }
 }
 
