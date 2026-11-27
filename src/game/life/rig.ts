@@ -16,12 +16,14 @@ import {
  */
 
 /** Vertex-coloured, so baked details (eyes, hooves) survive the per-instance tint. */
-export const CREATURE_MATERIAL = new MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
+const CREATURE_MATERIAL = new MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
 
 export interface PartDef {
   geometry: BufferGeometry;
   /** Most instances this part can have at once. */
   capacity: number;
+  /** Small parts (hands, hair, tools) don't need their own shadow draw call. */
+  noShadow?: boolean;
 }
 
 export class PartSet<Part extends string> {
@@ -35,7 +37,7 @@ export class PartSet<Part extends string> {
     this.counts = {} as Record<Part, number>;
     for (const name of names) {
       const mesh = new InstancedMesh(defs[name].geometry, CREATURE_MATERIAL, defs[name].capacity);
-      mesh.castShadow = castShadow;
+      mesh.castShadow = castShadow && !defs[name].noShadow;
       mesh.receiveShadow = true;
       // Instances move every frame, so a fixed bounding sphere would cull them wrongly.
       mesh.frustumCulled = false;

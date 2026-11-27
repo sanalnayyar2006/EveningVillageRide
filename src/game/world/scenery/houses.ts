@@ -74,11 +74,14 @@ function charpai(b: GeometryBatch, x: number, z: number, rotationY: number) {
   });
 }
 
+/** Height of a house's walls above the ground it stands on (where the roof starts). */
+export const wallTop = (house: HouseSpec) => PLINTH + house.h * (house.floors ?? 1);
+
 function buildHouse(b: GeometryBatch, house: HouseSpec, index: number) {
   const random = mulberry32(index + 101);
   const { w, d, h, wall, trim } = house;
   const floors = house.floors ?? 1;
-  const top = PLINTH + h * floors;
+  const top = wallTop(house);
 
   // The plinth extends below ground so houses on slopes never float.
   b.box([w + 0.4, PLINTH + 1, d + 0.4], [0, PLINTH / 2 - 0.5, 0], PALETTE.darkStone);

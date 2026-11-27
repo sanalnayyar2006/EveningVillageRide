@@ -32,6 +32,9 @@ export type LandmarkId =
   | "orchards";
 
 /** A named place in the village. Photos are labelled with these. */
+/** What to call anywhere that isn't a named place. */
+export const DEFAULT_PLACE = "Village Lanes";
+
 export interface Landmark {
   id: LandmarkId;
   name: string;
@@ -55,7 +58,7 @@ const fieldCentre = (id: string): Vec3Tuple => {
 const middleStall = MARKET_STALLS[Math.floor(MARKET_STALLS.length / 2)]!;
 
 // Smaller places are listed first: where two overlap, the nearest centre wins anyway.
-export const LANDMARKS: Landmark[] = [
+const LANDMARKS: Landmark[] = [
   {
     id: "entrance",
     name: "Village Gate",

@@ -1,4 +1,4 @@
-import { Color, Matrix4, SphereGeometry } from "three";
+import { Color, Matrix4, SphereGeometry, TorusGeometry } from "three";
 import { clamp, smoothstep } from "@/utils/math";
 import { GeometryBatch } from "@/game/world/batch";
 import { heightAt } from "@/game/world/terrain";
@@ -19,7 +19,8 @@ export type HumanActivity =
   | "kite"
   | "carry"
   | "wave"
-  | "chat";
+  | "chat"
+  | "cycle";
 
 export type Accessory = "hoe" | "bat" | "stick" | "pot";
 
@@ -35,6 +36,8 @@ export interface Look {
   /** A Himachali topi. */
   cap?: string;
   accessory?: Accessory;
+  /** Frame colour of the bicycle they ride everywhere, if they have one. */
+  bicycle?: string;
 }
 
 export type Villager = Agent<HumanActivity> & {
@@ -53,6 +56,15 @@ const HIP_X = 0.09;
 const ARM_LENGTH = 0.6;
 
 const WHITE = "#ffffff";
+
+// A bicycle sized for the rider, built along +Z with the saddle over the hips.
+const WHEEL_RADIUS = 0.36;
+const REAR_AXLE: [number, number, number] = [0, WHEEL_RADIUS, -0.45];
+const FRONT_AXLE: [number, number, number] = [0, WHEEL_RADIUS, 0.62];
+const BOTTOM_BRACKET: [number, number, number] = [0, 0.22, 0.18];
+const SADDLE_HEIGHT = 0.98;
+/** Wheel turns per crank turn. */
+const GEARING = 2;
 
 function shape(build: (b: GeometryBatch) => void) {
   const batch = new GeometryBatch();
@@ -78,6 +90,7 @@ function humanParts(capacity: number) {
       }),
     },
     hair: {
+      noShadow: true,
       capacity,
       // The top half of a sphere, sitting over the crown.
       geometry: shape((b) =>
@@ -89,6 +102,7 @@ function humanParts(capacity: number) {
       ),
     },
     cap: {
+      noShadow: true,
       capacity,
       geometry: shape((b) => {
         b.cylinder(0.105, 0.11, 0.1, [0, 0.29, -0.01], WHITE, 12);
@@ -101,7 +115,11 @@ function humanParts(capacity: number) {
         b.cylinder(0.042, 0.048, ARM_LENGTH, [0, -ARM_LENGTH / 2, 0], WHITE, 7),
       ),
     },
-    hand: { capacity: capacity * 2, geometry: shape((b) => b.sphere(0.045, [0, 0, 0], WHITE)) },
+    hand: {
+      noShadow: true,
+      capacity: capacity * 2,
+      geometry: shape((b) => b.sphere(0.045, [0, 0, 0], WHITE)),
+    },
     leg: {
       capacity: capacity * 2,
       geometry: shape((b) => {
@@ -114,6 +132,7 @@ function humanParts(capacity: number) {
       geometry: shape((b) => b.cylinder(0.19, 0.27, 0.82, [0, -0.41, 0], WHITE, 12)),
     },
     pot: {
+      noShadow: true,
       capacity,
       geometry: shape((b) => {
         b.sphere(0.15, [0, 0.36, 0], WHITE, [1, 0.85, 1]);
@@ -121,6 +140,7 @@ function humanParts(capacity: number) {
       }),
     },
     hoe: {
+      noShadow: true,
       capacity,
       geometry: shape((b) => {
         b.cylinder(0.018, 0.018, 1.1, [0, -0.55, 0], "#8a6440", 5);
@@ -128,13 +148,45 @@ function humanParts(capacity: number) {
       }),
     },
     bat: {
+      noShadow: true,
       capacity,
       geometry: shape((b) => {
         b.cylinder(0.018, 0.018, 0.28, [0, -0.14, 0], "#3a2a20", 5);
         b.box([0.1, 0.55, 0.035], [0, -0.55, 0], "#e6cf9a");
       }),
     },
+    bicycle: {
+      capacity,
+      geometry: shape((b) => {
+        const seat: [number, number, number] = [0, 0.88, -0.02];
+        const head: [number, number, number] = [0, 0.98, 0.55];
+        b.beam(BOTTOM_BRACKET, seat, 0.035, WHITE);
+        b.beam(seat, head, 0.035, WHITE);
+        b.beam(BOTTOM_BRACKET, head, 0.04, WHITE);
+        b.beam(BOTTOM_BRACKET, REAR_AXLE, 0.025, WHITE);
+        b.beam(seat, REAR_AXLE, 0.025, WHITE);
+        b.beam([0, 1.08, 0.53], FRONT_AXLE, 0.03, WHITE);
+        b.beam([-0.24, 1.1, 0.56], [0.24, 1.1, 0.56], 0.025, "#2b2b2b");
+        b.box([0.12, 0.05, 0.24], [0, SADDLE_HEIGHT - 0.06, -0.04], "#2b2420");
+        b.cylinder(0.09, 0.09, 0.03, BOTTOM_BRACKET, "#2b2b2b", 10, [0, 0, Math.PI / 2]);
+      }),
+    },
+    wheel: {
+      noShadow: true,
+      capacity: capacity * 2,
+      geometry: shape((b) => {
+        b.add(new TorusGeometry(WHEEL_RADIUS - 0.02, 0.022, 6, 20), [0, 0, 0], "#1e1e1e", [
+          0,
+          Math.PI / 2,
+          0,
+        ]);
+        // Two crossed spokes, so the turning shows.
+        b.box([0.012, WHEEL_RADIUS * 2 - 0.04, 0.012], [0, 0, 0], "#9a9a9a");
+        b.box([0.012, 0.012, WHEEL_RADIUS * 2 - 0.04], [0, 0, 0], "#9a9a9a");
+      }),
+    },
     stick: {
+      noShadow: true,
       capacity,
       geometry: shape((b) => b.cylinder(0.016, 0.02, 1.5, [0, -0.75, 0], "#7a5a38", 5)),
     },
@@ -287,8 +339,29 @@ function computePose(villager: Villager, clock: number) {
       pose.armR = -0.45 + Math.sin(t * 2.3) * 0.25;
       pose.armL = -0.15 + Math.sin(t * 1.7 + 1) * 0.15;
       break;
+    case "cycle": {
+      // Straight legs round the cranks, leaning over the bars.
+      const crank = Math.sin(villager.stride / (WHEEL_RADIUS * villager.look.scale * GEARING));
+      pose.hipY = SADDLE_HEIGHT;
+      pose.torsoPitch = 0.32;
+      pose.headPitch = -0.25;
+      pose.legL = -0.3 + crank * 0.32;
+      pose.legR = -0.3 - crank * 0.32;
+      pose.armL = pose.armR = -0.75;
+      pose.armOutL = 0.12;
+      pose.armOutR = -0.12;
+      break;
+    }
     case "stand":
       break;
+  }
+
+  // Stopped on a bicycle: off the saddle, astride the frame, both feet down.
+  if (villager.look.bicycle && villager.activity !== "cycle") {
+    pose.hipY = LEG_LENGTH + 0.04;
+    pose.armL = pose.armR = -0.6;
+    pose.legL = 0.08;
+    pose.legR = -0.08;
   }
 
   // Farmers carry their hoe over the shoulder when walking.
@@ -307,6 +380,7 @@ const armM = new Matrix4();
 const handM = new Matrix4();
 const legM = new Matrix4();
 const toolM = new Matrix4();
+const wheelM = new Matrix4();
 
 const paint = (colour: string) => tint.set(colour);
 
@@ -350,5 +424,14 @@ export function drawVillager(parts: PartSet<HumanPart>, villager: Villager, cloc
   if (look.skirt) {
     joint(legM, rootM, 0, pose.hipY + 0.05, 0, (pose.legL + pose.legR) * 0.25);
     parts.place("skirt", legM, paint(look.skirt));
+  }
+
+  if (look.bicycle) {
+    parts.place("bicycle", rootM, paint(look.bicycle));
+    const spin = villager.stride / (WHEEL_RADIUS * look.scale);
+    for (const axle of [REAR_AXLE, FRONT_AXLE]) {
+      joint(wheelM, rootM, axle[0], axle[1], axle[2], spin);
+      parts.place("wheel", wheelM, paint("#ffffff"));
+    }
   }
 }

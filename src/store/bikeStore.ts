@@ -23,6 +23,8 @@ export interface BikeTelemetry {
   pitch: number;
   wheelAngle: number;
   crankAngle: number;
+  /** True while the rider is pushing the pedals round. */
+  pedaling: boolean;
 }
 
 export interface TeleportRequest {
@@ -59,6 +61,7 @@ export const useBikeStore = create<BikeStore>()((set, get) => ({
     pitch: 0,
     wheelAngle: 0,
     crankAngle: 0,
+    pedaling: false,
   },
   moving: false,
   pendingTeleport: null,

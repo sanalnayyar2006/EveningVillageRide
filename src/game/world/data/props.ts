@@ -32,7 +32,7 @@ export const POLE_HEIGHT = 7;
 /** Sideways offsets of the three wires along each pole's crossbar. */
 export const WIRE_OFFSETS = [-0.55, 0, 0.55];
 /** How far a wire droops at the middle of a span (m). */
-export const WIRE_SAG = 0.7;
+const WIRE_SAG = 0.7;
 /** Distance between poles, and how far they stand from the highway's centre line. */
 const POLE_SPACING = 32;
 const POLE_SETBACK = 11;

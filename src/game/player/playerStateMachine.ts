@@ -1,7 +1,7 @@
 import type { PlayerState } from "@/types/game";
 
 /** Allowed moves out of each state. Anything not listed is rejected. */
-export const PLAYER_TRANSITIONS: Record<PlayerState, readonly PlayerState[]> = {
+const PLAYER_TRANSITIONS: Record<PlayerState, readonly PlayerState[]> = {
   idle: ["cycling", "paused"],
   cycling: ["stopping", "interacting", "viewingGallery", "paused", "idle"],
   stopping: ["takingPhoto", "cycling", "paused"],

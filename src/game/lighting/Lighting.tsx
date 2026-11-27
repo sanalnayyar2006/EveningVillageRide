@@ -2,9 +2,11 @@
 
 import { Sky } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useRef, type ComponentRef } from "react";
+import { useEffect, useRef, type ComponentRef } from "react";
 import { Color, Vector3, type DirectionalLight, type Fog, type HemisphereLight } from "three";
 import { ambient } from "@/game/ambient/ambientState";
+import { waterUniforms } from "@/game/world/waterShader";
+import { qualityFor } from "@/game/core/quality";
 import { WORLD_MATERIALS } from "@/game/world/worldMaterials";
 import { useBikeStore } from "@/store/bikeStore";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -15,9 +17,6 @@ const GOLDEN_SUN = new Vector3(...G.sunDirection).normalize();
 const SUN_DISTANCE = 120;
 const SKY_SUN_POSITION = GOLDEN_SUN.clone().multiplyScalar(SUN_DISTANCE).toArray();
 const SHADOW_EXTENT = G.shadowExtent;
-const SHADOW_MAP_SIZE = 2048;
-/** World size of one shadow-map pixel. */
-const SHADOW_TEXEL = (SHADOW_EXTENT * 2) / SHADOW_MAP_SIZE;
 
 /** The two ends of the evening, as colours ready to blend. */
 const FROM = {
@@ -25,12 +24,14 @@ const FROM = {
   sky: new Color(G.skyColor),
   ground: new Color(G.groundColor),
   fog: new Color(G.fogColor),
+  water: new Color(G.waterSky).multiplyScalar(G.waterSkyIntensity),
 };
 const TO = {
   sun: new Color(DUSK.sunColor),
   sky: new Color(DUSK.skyColor),
   ground: new Color(DUSK.groundColor),
   fog: new Color(DUSK.fogColor),
+  water: new Color(DUSK.waterSky).multiplyScalar(DUSK.waterSkyIntensity),
 };
 
 // Rebuilt every frame as the sun moves.
@@ -58,9 +59,11 @@ const snapped = new Vector3();
  * Where the shadow camera should centre: the rider, rounded to whole shadow
  * texels so shadows don't shimmer as the camera follows.
  */
-function snappedShadowCentre(point: Vector3, out: Vector3): Vector3 {
-  const right = Math.round(point.dot(lightRight) / SHADOW_TEXEL) * SHADOW_TEXEL;
-  const up = Math.round(point.dot(lightUp) / SHADOW_TEXEL) * SHADOW_TEXEL;
+function snappedShadowCentre(point: Vector3, mapSize: number, out: Vector3): Vector3 {
+  /** World size of one shadow-map pixel. */
+  const texel = (SHADOW_EXTENT * 2) / mapSize;
+  const right = Math.round(point.dot(lightRight) / texel) * texel;
+  const up = Math.round(point.dot(lightUp) / texel) * texel;
   const depth = point.dot(sunDirection);
   return out
     .copy(lightRight)
@@ -72,11 +75,20 @@ function snappedShadowCentre(point: Vector3, out: Vector3): Vector3 {
 /** Sun, sky, ambient fill and fog, slowly turning from golden hour to dusk. Every light lives here. */
 export function Lighting() {
   const shadows = useSettingsStore((s) => s.shadows);
+  const { shadowMapSize } = qualityFor(useSettingsStore((s) => s.highQuality));
   const sun = useRef<DirectionalLight>(null);
   const fill = useRef<HemisphereLight>(null);
   const sky = useRef<ComponentRef<typeof Sky>>(null);
   const gl = useThree((state) => state.gl);
   const scene = useThree((state) => state.scene);
+
+  // A new map size only takes effect once the old shadow map is thrown away.
+  useEffect(() => {
+    const light = sun.current;
+    if (!light?.shadow.map) return;
+    light.shadow.map.dispose();
+    light.shadow.map = null;
+  }, [shadowMapSize]);
 
   useFrame(() => {
     const light = sun.current;
@@ -96,7 +108,13 @@ export function Lighting() {
       fill.current.intensity =
         G.hemisphereIntensity + (DUSK.hemisphereIntensity - G.hemisphereIntensity) * p;
     }
-    (scene.fog as Fog | null)?.color.lerpColors(FROM.fog, TO.fog, p);
+    const fog = scene.fog as Fog | null;
+    if (fog) {
+      fog.color.lerpColors(FROM.fog, TO.fog, p);
+      fog.near = G.fogNear + (DUSK.fogNear - G.fogNear) * p;
+      fog.far = G.fogFar + (DUSK.fogFar - G.fogFar) * p;
+    }
+    waterUniforms.uWaterSky.value.lerpColors(FROM.water, TO.water, p);
     gl.toneMappingExposure = G.exposure + (DUSK.exposure - G.exposure) * p;
     sky.current?.material.uniforms.sunPosition?.value
       .copy(sunDirection)
@@ -106,7 +124,7 @@ export function Lighting() {
 
     // The shadow map only covers a small square, so it travels with the rider.
     const { x, y, z } = useBikeStore.getState().telemetry;
-    snappedShadowCentre(focus.set(x, y, z), snapped);
+    snappedShadowCentre(focus.set(x, y, z), shadowMapSize, snapped);
     light.position.copy(snapped).addScaledVector(sunDirection, SUN_DISTANCE);
     light.target.position.copy(snapped);
     light.target.updateMatrixWorld();
@@ -130,9 +148,10 @@ export function Lighting() {
         color={G.sunColor}
         intensity={G.sunIntensity}
         castShadow={shadows}
-        shadow-mapSize={[SHADOW_MAP_SIZE, SHADOW_MAP_SIZE]}
+        shadow-mapSize={[shadowMapSize, shadowMapSize]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.04}
+        shadow-radius={G.shadowSoftness}
         shadow-camera-left={-SHADOW_EXTENT}
         shadow-camera-right={SHADOW_EXTENT}
         shadow-camera-top={SHADOW_EXTENT}

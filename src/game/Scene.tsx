@@ -7,6 +7,7 @@ import { Butterflies } from "./ambient/Butterflies";
 import { Fireflies } from "./ambient/Fireflies";
 import { Kites } from "./ambient/Kites";
 import { Leaves } from "./ambient/Leaves";
+import { Puffs } from "./ambient/Puffs";
 import { Train } from "./ambient/Train";
 import { AudioListener } from "./audio/AudioListener";
 import { BikeController } from "./bike/BikeController";
@@ -17,6 +18,7 @@ import { InputFrameEnd } from "./core/input/InputFrameEnd";
 import { Animals } from "./life/Animals";
 import { Villagers } from "./life/Villagers";
 import { Lighting } from "./lighting/Lighting";
+import { PostEffects } from "./lighting/PostEffects";
 import { PhotoMode } from "./photography/PhotoMode";
 import { World } from "./world/World";
 
@@ -43,10 +45,12 @@ export function Scene() {
       <Fireflies />
       <Kites />
       <Leaves />
+      <Puffs />
       <Train />
       <AudioListener />
       <PhotoMode />
       <InputFrameEnd />
+      <PostEffects />
     </>
   );
 }

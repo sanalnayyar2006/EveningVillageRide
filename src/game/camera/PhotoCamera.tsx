@@ -4,6 +4,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useRapier } from "@react-three/rapier";
 import { useMemo } from "react";
 import { Matrix4, PerspectiveCamera, Quaternion, Vector3 } from "three";
+import { riderEye } from "@/game/bike/Rider";
 import { FRAME_ORDER } from "@/game/core/frameOrder";
 import { input } from "@/game/core/input/InputManager";
 import { firstPersonBlend, PHOTO_CONFIG as CFG } from "@/game/photography/photoConfig";
@@ -93,11 +94,10 @@ export function PhotoCamera() {
 
     const bike = useBikeStore.getState().telemetry;
     const yaw = bike.heading + rig.yaw;
-    tmp.eye.set(
-      bike.x + Math.sin(bike.heading) * CFG.eye.forward,
-      bike.y + CFG.eye.height,
-      bike.z + Math.cos(bike.heading) * CFG.eye.forward,
-    );
+    const { x: side, y: up, z: ahead } = riderEye(tmp.eye);
+    const sin = Math.sin(bike.heading);
+    const cos = Math.cos(bike.heading);
+    tmp.eye.set(bike.x + side * cos + ahead * sin, bike.y + up, bike.z - side * sin + ahead * cos);
     tmp.direction.set(
       Math.sin(yaw) * Math.cos(rig.pitch),
       Math.sin(rig.pitch),

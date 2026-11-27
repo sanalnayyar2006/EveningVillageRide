@@ -143,6 +143,7 @@ export function BikeController() {
       pitch,
       wheelAngle: bike.wheelAngle,
       crankAngle: bike.crankAngle,
+      pedaling: bike.pedaling,
     });
     useBikeStore.getState().setMoving(Math.abs(bike.speed) > MOVING_THRESHOLD);
   }, FRAME_ORDER.bike);

@@ -39,6 +39,8 @@ function Album() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Escape") {
+        // Handled here, so the pause menu leaves it alone.
+        e.preventDefault();
         if (selected) setSelectedId(null);
         else close();
       } else if (selected && e.code === "ArrowLeft") step(-1);

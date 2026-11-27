@@ -1,6 +1,7 @@
 export type Vec3Tuple = [number, number, number];
 
-export type GamePhase = "loading" | "playing";
+/** loading → title (the menu over the live scene) → playing. */
+export type GamePhase = "loading" | "title" | "playing";
 
 /** Exactly one is active at a time (GameplaySystem.md §1). */
 export type PlayerState =

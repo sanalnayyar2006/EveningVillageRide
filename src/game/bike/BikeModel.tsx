@@ -4,11 +4,12 @@ import { useFrame } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { CylinderGeometry, Group, Mesh, Quaternion, Vector3, type Material } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { Merged } from "@/game/core/Merged";
 import { useBikeStore } from "@/store/bikeStore";
 import { BIKE_CONFIG } from "./bikeConfig";
 import { BIKE_POINTS, GRIP_LOCAL, HEAD_ANGLE } from "./bikeGeometry";
 import { BIKE_MATERIALS as mat } from "./bikeMaterials";
-import { Rider } from "./Rider";
+import { Rider, riderPosture, STOPPED_TILT } from "./Rider";
 
 const WHEEL_RADIUS = BIKE_CONFIG.wheelRadius;
 const UP = new Vector3(0, 1, 0);
@@ -97,16 +98,18 @@ const SPOKES = (() => {
 function Wheel({ wheelRef }: { wheelRef: React.Ref<Group> }) {
   return (
     <group ref={wheelRef}>
-      <mesh material={mat.tire} rotation-y={Math.PI / 2}>
-        <torusGeometry args={[WHEEL_RADIUS - 0.022, 0.024, 8, 32]} />
-      </mesh>
-      <mesh material={mat.chrome} rotation-y={Math.PI / 2}>
-        <torusGeometry args={[WHEEL_RADIUS - 0.05, 0.01, 6, 32]} />
-      </mesh>
-      <mesh geometry={SPOKES} material={mat.chrome} />
-      <mesh material={mat.chrome} rotation-z={Math.PI / 2}>
-        <cylinderGeometry args={[0.025, 0.025, 0.1, 10]} />
-      </mesh>
+      <Merged>
+        <mesh material={mat.tire} rotation-y={Math.PI / 2}>
+          <torusGeometry args={[WHEEL_RADIUS - 0.022, 0.024, 8, 32]} />
+        </mesh>
+        <mesh material={mat.chrome} rotation-y={Math.PI / 2}>
+          <torusGeometry args={[WHEEL_RADIUS - 0.05, 0.01, 6, 32]} />
+        </mesh>
+        <mesh geometry={SPOKES} material={mat.chrome} />
+        <mesh material={mat.chrome} rotation-z={Math.PI / 2}>
+          <cylinderGeometry args={[0.025, 0.025, 0.1, 10]} />
+        </mesh>
+      </Merged>
     </group>
   );
 }
@@ -148,7 +151,10 @@ export function BikeModel() {
     root.current?.position.set(bike.x, bike.y, bike.z);
     if (root.current) root.current.rotation.y = bike.heading;
     if (pitchGroup.current) pitchGroup.current.rotation.x = -bike.pitch;
-    if (leanGroup.current) leanGroup.current.rotation.z = -bike.lean;
+    // Stopped, the bike rests tilted onto the rider's left foot.
+    if (leanGroup.current) {
+      leanGroup.current.rotation.z = -bike.lean - STOPPED_TILT * riderPosture.footDown;
+    }
     if (steerGroup.current) steerGroup.current.rotation.y = bike.steer;
     if (rearWheel.current) rearWheel.current.rotation.x = bike.wheelAngle;
     if (frontWheel.current) frontWheel.current.rotation.x = bike.wheelAngle;
@@ -162,55 +168,66 @@ export function BikeModel() {
     <group ref={root}>
       <group ref={pitchGroup}>
         <group ref={leanGroup}>
-          {/* Frame, with the double top tube typical of a roadster. */}
-          <Tube from={P.bottomBracket} to={POINTS.seatPostTop} radius={0.02} />
-          <Tube from={P.seatCluster} to={P.headTop} radius={0.019} />
-          <Tube from={POINTS.lowerTopTubeBack} to={POINTS.lowerTopTubeFront} radius={0.016} />
-          <Tube from={P.bottomBracket} to={P.headBottom} radius={0.022} />
-          <Tube from={P.headBottom} to={P.headTop} radius={0.026} />
-          <Tube from={POINTS.chainstayLeft} to={POINTS.rearDropoutLeft} radius={0.012} />
-          <Tube from={POINTS.chainstayRight} to={POINTS.rearDropoutRight} radius={0.012} />
-          <Tube from={POINTS.seatstayLeft} to={POINTS.rearDropoutLeft} radius={0.011} />
-          <Tube from={POINTS.seatstayRight} to={POINTS.rearDropoutRight} radius={0.011} />
+          <Merged>
+            {/* Frame, with the double top tube typical of a roadster. */}
+            <Tube from={P.bottomBracket} to={POINTS.seatPostTop} radius={0.02} />
+            <Tube from={P.seatCluster} to={P.headTop} radius={0.019} />
+            <Tube from={POINTS.lowerTopTubeBack} to={POINTS.lowerTopTubeFront} radius={0.016} />
+            <Tube from={P.bottomBracket} to={P.headBottom} radius={0.022} />
+            <Tube from={P.headBottom} to={P.headTop} radius={0.026} />
+            <Tube from={POINTS.chainstayLeft} to={POINTS.rearDropoutLeft} radius={0.012} />
+            <Tube from={POINTS.chainstayRight} to={POINTS.rearDropoutRight} radius={0.012} />
+            <Tube from={POINTS.seatstayLeft} to={POINTS.rearDropoutLeft} radius={0.011} />
+            <Tube from={POINTS.seatstayRight} to={POINTS.rearDropoutRight} radius={0.011} />
 
-          {/* Saddle. */}
-          <mesh material={mat.saddle} position={P.saddle} scale={[0.1, 0.035, 0.15]}>
-            <sphereGeometry args={[1, 12, 8]} />
-          </mesh>
-          <Tube from={POINTS.seatPostTop} to={P.saddle} radius={0.012} material={mat.chrome} />
+            {/* Saddle. */}
+            <mesh material={mat.saddle} position={P.saddle} scale={[0.1, 0.035, 0.15]}>
+              <sphereGeometry args={[1, 12, 8]} />
+            </mesh>
+            <Tube from={POINTS.seatPostTop} to={P.saddle} radius={0.012} material={mat.chrome} />
 
-          {/* Rear carrier. */}
-          <mesh material={mat.frame} position={[0, 0.8, -0.5]}>
-            <boxGeometry args={[0.16, 0.012, 0.48]} />
-          </mesh>
-          <Tube from={POINTS.rackStrutLeft} to={POINTS.rearDropoutLeft} radius={0.008} />
-          <Tube from={POINTS.rackStrutRight} to={POINTS.rearDropoutRight} radius={0.008} />
-          <Tube from={POINTS.rackFront} to={P.seatCluster} radius={0.008} />
+            {/* Rear carrier. */}
+            <mesh material={mat.frame} position={[0, 0.8, -0.5]}>
+              <boxGeometry args={[0.16, 0.012, 0.48]} />
+            </mesh>
+            <Tube from={POINTS.rackStrutLeft} to={POINTS.rearDropoutLeft} radius={0.008} />
+            <Tube from={POINTS.rackStrutRight} to={POINTS.rearDropoutRight} radius={0.008} />
+            <Tube from={POINTS.rackFront} to={P.seatCluster} radius={0.008} />
 
-          {/* Chain guard. */}
-          <mesh material={mat.frame} position={[-0.085, 0.31, -0.28]} rotation-x={CHAIN_GUARD_TILT}>
-            <boxGeometry args={[0.01, 0.16, 0.62]} />
-          </mesh>
+            {/* Chain guard. */}
+            <mesh
+              material={mat.frame}
+              position={[-0.085, 0.31, -0.28]}
+              rotation-x={CHAIN_GUARD_TILT}
+            >
+              <boxGeometry args={[0.01, 0.16, 0.62]} />
+            </mesh>
+
+            <group position={P.rearAxle}>
+              <Mudguard startAngle={-0.15} />
+              <mesh material={mat.reflector} position={[0, 0.72 - WHEEL_RADIUS, -0.25]}>
+                <boxGeometry args={[0.05, 0.03, 0.01]} />
+              </mesh>
+            </group>
+          </Merged>
 
           <group position={P.rearAxle}>
             <Wheel wheelRef={rearWheel} />
-            <Mudguard startAngle={-0.15} />
-            <mesh material={mat.reflector} position={[0, 0.72 - WHEEL_RADIUS, -0.25]}>
-              <boxGeometry args={[0.05, 0.03, 0.01]} />
-            </mesh>
           </group>
 
           {/* Chainring, crank arms and pedals. */}
           <group ref={crank} position={P.bottomBracket}>
-            <mesh material={mat.chrome} position-x={-0.075} rotation-z={Math.PI / 2}>
-              <cylinderGeometry args={[0.095, 0.095, 0.008, 24]} />
-            </mesh>
-            <mesh material={mat.chrome} position={[-P.pedalOffset + 0.02, -P.crankLength / 2, 0]}>
-              <boxGeometry args={[0.012, P.crankLength, 0.022]} />
-            </mesh>
-            <mesh material={mat.chrome} position={[P.pedalOffset - 0.02, P.crankLength / 2, 0]}>
-              <boxGeometry args={[0.012, P.crankLength, 0.022]} />
-            </mesh>
+            <Merged>
+              <mesh material={mat.chrome} position-x={-0.075} rotation-z={Math.PI / 2}>
+                <cylinderGeometry args={[0.095, 0.095, 0.008, 24]} />
+              </mesh>
+              <mesh material={mat.chrome} position={[-P.pedalOffset + 0.02, -P.crankLength / 2, 0]}>
+                <boxGeometry args={[0.012, P.crankLength, 0.022]} />
+              </mesh>
+              <mesh material={mat.chrome} position={[P.pedalOffset - 0.02, P.crankLength / 2, 0]}>
+                <boxGeometry args={[0.012, P.crankLength, 0.022]} />
+              </mesh>
+            </Merged>
             <mesh
               ref={pedalRight}
               material={mat.rubber}
@@ -230,32 +247,36 @@ export function BikeModel() {
           {/* Steering assembly: tilted to the head tube angle, then turned by the steer angle. */}
           <group position={P.headBottom} rotation-x={-HEAD_ANGLE}>
             <group ref={steerGroup}>
-              <Tube from={POINTS.forkTopLeft} to={POINTS.forkAxleLeft} radius={0.013} />
-              <Tube from={POINTS.forkTopRight} to={POINTS.forkAxleRight} radius={0.013} />
-              <Tube
-                from={POINTS.stemBottom}
-                to={POINTS.stemTop}
-                radius={0.014}
-                material={mat.chrome}
-              />
-              <Handlebar side={1} />
-              <Handlebar side={-1} />
-              {/* Bell, on the left of the bar. */}
-              <mesh material={mat.chrome} position={[0.17, 0.4, -0.02]}>
-                <sphereGeometry args={[0.028, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-              </mesh>
-              {/* Headlamp. */}
-              <mesh
-                material={mat.chrome}
-                position={[0, 0.12, 0.06]}
-                rotation-x={Math.PI / 2 + HEAD_ANGLE}
-              >
-                <cylinderGeometry args={[0.04, 0.03, 0.06, 12]} />
-              </mesh>
-              {/* Undo the head tilt so the front wheel stands upright. */}
+              <Merged>
+                <Tube from={POINTS.forkTopLeft} to={POINTS.forkAxleLeft} radius={0.013} />
+                <Tube from={POINTS.forkTopRight} to={POINTS.forkAxleRight} radius={0.013} />
+                <Tube
+                  from={POINTS.stemBottom}
+                  to={POINTS.stemTop}
+                  radius={0.014}
+                  material={mat.chrome}
+                />
+                <Handlebar side={1} />
+                <Handlebar side={-1} />
+                {/* Bell, on the left of the bar. */}
+                <mesh material={mat.chrome} position={[0.17, 0.4, -0.02]}>
+                  <sphereGeometry args={[0.028, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+                </mesh>
+                {/* Headlamp. */}
+                <mesh
+                  material={mat.chrome}
+                  position={[0, 0.12, 0.06]}
+                  rotation-x={Math.PI / 2 + HEAD_ANGLE}
+                >
+                  <cylinderGeometry args={[0.04, 0.03, 0.06, 12]} />
+                </mesh>
+                {/* Undo the head tilt so the front wheel stands upright. */}
+                <group position={P.forkAxleLocal} rotation-x={HEAD_ANGLE}>
+                  <Mudguard startAngle={0.55} />
+                </group>
+              </Merged>
               <group position={P.forkAxleLocal} rotation-x={HEAD_ANGLE}>
                 <Wheel wheelRef={frontWheel} />
-                <Mudguard startAngle={0.55} />
               </group>
             </group>
           </group>

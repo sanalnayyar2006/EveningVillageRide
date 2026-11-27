@@ -15,6 +15,7 @@ const RIDE_CONTROLS: { keys: string[]; label: string }[] = [
   { keys: ["G"], label: "Album" },
   { keys: ["Drag"], label: "Look around" },
   { keys: ["Scroll"], label: "Camera distance" },
+  { keys: ["Esc"], label: "Pause" },
 ];
 
 /** Unobtrusive controls list; fades back while riding so the view stays clear. */

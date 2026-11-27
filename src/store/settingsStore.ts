@@ -8,6 +8,10 @@ export interface Settings {
   sfxVolume: number;
   showHints: boolean;
   shadows: boolean;
+  /** Bloom, colour grade and vignette. */
+  effects: boolean;
+  /** Sharper image and shadows; off for slower computers (see core/quality). */
+  highQuality: boolean;
 }
 
 interface SettingsStore extends Settings {
@@ -21,6 +25,8 @@ const DEFAULT_SETTINGS: Settings = {
   sfxVolume: 0.9,
   showHints: true,
   shadows: true,
+  effects: true,
+  highQuality: true,
 };
 
 /** Player preferences, saved to localStorage. */

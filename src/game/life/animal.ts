@@ -122,7 +122,7 @@ export function createAnimalParts(species: Species, capacity: number) {
     body: { capacity, geometry: bodyShape(species, build) },
     head: { capacity, geometry: headShape(species) },
     leg: { capacity: capacity * 4, geometry: legShape(build) },
-    tail: { capacity, geometry: tailShape(species, build) },
+    tail: { capacity, geometry: tailShape(species, build), noShadow: true },
   });
 }
 

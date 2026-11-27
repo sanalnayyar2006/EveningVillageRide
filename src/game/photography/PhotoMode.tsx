@@ -5,7 +5,7 @@ import { useRef } from "react";
 import { events } from "@/game/core/events";
 import { FRAME_ORDER, MAX_DT } from "@/game/core/frameOrder";
 import { input } from "@/game/core/input/InputManager";
-import { landmarkAt } from "@/game/world/data/landmarks";
+import { DEFAULT_PLACE, landmarkAt } from "@/game/world/data/landmarks";
 import { useBikeStore } from "@/store/bikeStore";
 import { useGalleryStore } from "@/store/galleryStore";
 import { usePhotoStore } from "@/store/photoStore";
@@ -14,8 +14,6 @@ import { approach } from "@/utils/math";
 import { capturePhoto } from "./capture";
 import { PHOTO_CONFIG } from "./photoConfig";
 
-const DEFAULT_PLACE = "Village Lanes";
-
 /**
  * The phone flow (GameplaySystem.md §4):
  * C → bike brakes to a stop → phone comes out → photo mode → Esc/C → phone away → ride on.
@@ -23,6 +21,7 @@ const DEFAULT_PLACE = "Village Lanes";
  */
 export function PhotoMode() {
   const busy = useRef(false);
+  const shutterPressed = useRef(false);
 
   useFrame((_, frameDelta) => {
     const dt = Math.min(frameDelta, MAX_DT);
@@ -68,12 +67,17 @@ export function PhotoMode() {
     }
   }, FRAME_ORDER.player);
 
-  // The shutter runs after the cameras, so the photo matches what is on screen.
-  useFrame(({ gl, scene, camera }) => {
+  // The shutter is read before the frame is drawn, while this frame's input is still live...
+  useFrame(() => {
     const { hud } = usePhotoStore.getState();
     const shutter = input.wasClicked() || input.wasPressed("shutter");
-    if (!hud.ready || !shutter || busy.current) return;
+    if (hud.ready && shutter && !busy.current) shutterPressed.current = true;
+  }, FRAME_ORDER.shutter);
 
+  // ...and the picture is taken just after, from the finished frame.
+  useFrame(({ gl }) => {
+    if (!shutterPressed.current) return;
+    shutterPressed.current = false;
     busy.current = true;
     const bike = useBikeStore.getState().telemetry;
     const { rig, setLastShot } = usePhotoStore.getState();
@@ -81,7 +85,7 @@ export function PhotoMode() {
     const landmark = landmarkAt(bike.x, bike.z);
     events.emit("photo:taken", { id });
 
-    capturePhoto(gl, scene, camera)
+    capturePhoto(gl.domElement)
       .then(async (shot) => {
         setLastShot({ id, url: URL.createObjectURL(shot.image) });
         await useGalleryStore.getState().add({

@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import type { Mesh } from "three";
 import { useGameEvent } from "@/hooks/useGameEvent";
+import { events } from "@/game/core/events";
 import { FRAME_ORDER, MAX_DT } from "@/game/core/frameOrder";
 import { ambient } from "@/game/ambient/ambientState";
 import { useBikeStore } from "@/store/bikeStore";
@@ -21,6 +22,10 @@ const RESUME_DISTANCE = 4.5;
 /** Ringing the bell makes people within this distance wave. */
 const BELL_HEARING = 14;
 const WAVE_SECONDS = 1.6;
+/** A child on a bicycle rings their bell once when the rider comes this close (m)… */
+const KID_BELL_DISTANCE = 12;
+/** …and again only after the rider has been this far away. */
+const KID_BELL_REARM = 30;
 
 /** Busy with something they won't stop for a wave: sitting down, working, serving tea. */
 const BUSY: ReadonlySet<HumanActivity> = new Set(["sit", "sip", "work", "pour", "kite"]);
@@ -35,6 +40,7 @@ export function Villagers() {
   const parts = useMemo(() => createHumanParts(everyone.length), [everyone]);
   const random = useMemo(() => mulberry32(5), []);
   const waving = useRef(new Map<Villager, number>());
+  const rangBell = useRef(new Set<Villager>());
   const ball = useRef<Mesh>(null);
 
   useEffect(() => () => parts.dispose(), [parts]);
@@ -65,6 +71,18 @@ export function Villagers() {
         v.held = null;
       }
       updateAgent(v, dt, random);
+
+      if (v.look.bicycle) {
+        if (distance > KID_BELL_REARM) rangBell.current.delete(v);
+        else if (
+          distance < KID_BELL_DISTANCE &&
+          v.activity === "cycle" &&
+          !rangBell.current.has(v)
+        ) {
+          rangBell.current.add(v);
+          events.emit("life:bicycleBell", { position: [v.x, bike.y + 1, v.z] });
+        }
+      }
 
       // A quick look the first time the bike comes really close; otherwise eyes on their own business.
       let look = glanceYaw(v, bike.x, bike.z, dt, 1.2);

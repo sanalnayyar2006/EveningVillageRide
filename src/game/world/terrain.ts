@@ -30,7 +30,7 @@ const TERRACED = FIELDS.filter(isTerraced).map((f) => ({
 }));
 const STREAM_BOUNDS = boundsOf(STREAM.points, STREAM.bedHalfWidth + 2);
 
-export const inTerracedField = (x: number, z: number) =>
+const inTerracedField = (x: number, z: number) =>
   TERRACED.some((f) => inBounds(x, z, f.bounds) && inPolygon(x, z, f.polygon));
 
 /** Flat steps with a short riser between them, like hillside terraces. */

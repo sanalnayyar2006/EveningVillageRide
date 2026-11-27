@@ -68,6 +68,34 @@ function pingPong(path: Point[], pause: number, speed = 1.1, rest: HumanActivity
   ];
 }
 
+const CYCLING_SPEED = 3.4;
+
+/** Riding a route on a bicycle and back, stopping to chat at each end. */
+const cycleLoop = (path: Point[], pause: number): Script => [
+  walk(path, CYCLING_SPEED, "cycle"),
+  stay(pause, "chat"),
+  walk([...path].reverse(), CYCLING_SPEED, "cycle"),
+  stay(pause, "chat"),
+];
+
+/** Along the village road from near the gate up past the bazaar. */
+const VILLAGE_ROAD_RIDE = pxPath([
+  [706, 670],
+  [707, 600],
+  [690, 545],
+  [655, 485],
+  [628, 425],
+  [622, 360],
+]);
+
+const EAST_LANE_RIDE = pxPath([
+  [745, 700],
+  [750, 625],
+  [762, 560],
+  [782, 500],
+  [802, 420],
+]);
+
 function villager(look: Look, script: Script, start?: Point, heading = 0): Villager {
   const first = script[0];
   const from: Point =
@@ -296,6 +324,20 @@ export function createVillagers(): Villager[] {
       child(woman("#e8789a", "#5a3a8a", 2)),
       [stay(999, "kite", Math.PI * 0.95)],
       px(432, 300),
+    ),
+
+    // Kids racing their bicycles up and down the village road, and round the east lane.
+    villager(
+      child(man("#3a8fd0", "#2c2c3a", 0, { bicycle: "#b8312f" }), 0.72),
+      cycleLoop(VILLAGE_ROAD_RIDE, 6),
+    ),
+    villager(
+      child(woman("#f08a24", "#7a2a4a", 3, { bicycle: "#2f6f9a" })),
+      cycleLoop([...VILLAGE_ROAD_RIDE].reverse(), 9),
+    ),
+    villager(
+      child(man("#c83a3a", "#3a3a2c", 2, { bicycle: "#2a2a2a" }), 0.7),
+      cycleLoop(EAST_LANE_RIDE, 5),
     ),
 
     // The goatherd ambles about the orchard while the goats graze.

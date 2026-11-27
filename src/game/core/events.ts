@@ -13,6 +13,8 @@ export interface GameEvents {
   "life:bleat": { position: Vec3Tuple };
   "life:birdsFlush": { position: Vec3Tuple };
   "life:cheer": { position: Vec3Tuple };
+  /** A child on a bicycle ringing their bell. */
+  "life:bicycleBell": { position: Vec3Tuple };
   /** Ambient happenings chosen by the AmbientDirector. */
   "ambient:templeBell": { position: Vec3Tuple };
   "ambient:trainHorn": { position: Vec3Tuple };

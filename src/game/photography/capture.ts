@@ -1,4 +1,3 @@
-import type { Camera, Scene, WebGLRenderer } from "three";
 import { PHOTO_CONFIG } from "./photoConfig";
 
 export interface CapturedImage {
@@ -11,7 +10,7 @@ export interface CapturedImage {
 const { maxWidth, aspect, thumbWidth, quality } = PHOTO_CONFIG.capture;
 
 /** The centred 16:9 part of a `width` × `height` view; the HUD frames the same area. */
-export function photoFrame(width: number, height: number) {
+function photoFrame(width: number, height: number) {
   const frameWidth = Math.min(width, height * aspect);
   const frameHeight = frameWidth / aspect;
   return {
@@ -43,20 +42,14 @@ const toJpeg = (canvas: HTMLCanvasElement) =>
   );
 
 /**
- * Photographs what `camera` sees, without the HUD (which is HTML, not part of
- * the canvas). The scene is rendered and copied in the same task: the WebGL
- * drawing buffer is only guaranteed to hold the image until the browser
- * composites, so the copy must happen before any await.
+ * Photographs the frame just drawn to `canvas`, without the HUD (which is
+ * HTML, not part of the canvas). Call it right after the frame is rendered:
+ * the WebGL drawing buffer only holds the image until the browser composites,
+ * so the copy must happen before any await.
  */
-export async function capturePhoto(
-  gl: WebGLRenderer,
-  scene: Scene,
-  camera: Camera,
-): Promise<CapturedImage> {
-  gl.render(scene, camera);
-  const source = gl.domElement;
-  const crop = photoFrame(source.width, source.height);
-  const full = scaledCopy(source, crop, Math.min(maxWidth, crop.width));
+export async function capturePhoto(canvas: HTMLCanvasElement): Promise<CapturedImage> {
+  const crop = photoFrame(canvas.width, canvas.height);
+  const full = scaledCopy(canvas, crop, Math.min(maxWidth, crop.width));
   const thumb = scaledCopy(
     full,
     { x: 0, y: 0, width: full.width, height: full.height },

@@ -24,6 +24,12 @@ class AudioEngine {
     };
   }
 
+  /** Silence everything while the game is paused, and pick up where it left off after. */
+  setPaused(paused: boolean): void {
+    if (!this.ctx) return;
+    void (paused ? this.ctx.suspend() : this.ctx.resume());
+  }
+
   setVolumes(master: number, sfx: number): void {
     this.volumes = { master, sfx };
     this.applyVolumes();
@@ -40,8 +46,23 @@ class AudioEngine {
   }
 
   /**
-   * An output for a sound at a point in the world: quieter with distance
-   * (silent beyond `range` metres) and panned to the side it comes from.
+   * How a sound at a point should be heard: quieter with distance (silent
+   * beyond `range` metres) and panned to the side it comes from.
+   */
+  placement(x: number, y: number, z: number, range: number): { gain: number; pan: number } {
+    const dx = x - this.listener.x;
+    const dz = z - this.listener.z;
+    const distance = Math.hypot(dx, y - this.listener.y, dz);
+    if (distance >= range) return { gain: 0, pan: 0 };
+    // Falls off smoothly to nothing at the edge of earshot, but never jumps in loudly.
+    const gain = Math.min(1, 4 / Math.max(distance, 4)) * (1 - distance / range);
+    // Facing (sin h, cos h), the listener's right-hand side is (-cos h, sin h); right is positive pan.
+    const right = dz * Math.sin(this.listener.heading) - dx * Math.cos(this.listener.heading);
+    return { gain, pan: Math.max(-1, Math.min(1, right / Math.max(distance, 1))) };
+  }
+
+  /**
+   * An output for a one-off sound at a point in the world (see `placement`).
    * Returns null when audio is locked or the sound is out of earshot.
    */
   spatialOutput(
@@ -50,19 +71,14 @@ class AudioEngine {
   ): { ctx: AudioContext; out: AudioNode } | null {
     const bus = this.sfxOutput();
     if (!bus) return null;
-    const { ctx } = bus;
-    const dx = x - this.listener.x;
-    const dz = z - this.listener.z;
-    const distance = Math.hypot(dx, y - this.listener.y, dz);
-    if (distance > range) return null;
+    const heard = this.placement(x, y, z, range);
+    if (heard.gain === 0) return null;
 
+    const { ctx } = bus;
     const gain = ctx.createGain();
-    // Falls off smoothly to nothing at the edge of earshot, but never jumps in loudly.
-    gain.gain.value = Math.min(1, 4 / Math.max(distance, 4)) * (1 - distance / range);
+    gain.gain.value = heard.gain;
     const panner = ctx.createStereoPanner();
-    // Facing (sin h, cos h), the listener's right-hand side is (-cos h, sin h); right is positive pan.
-    const right = dz * Math.sin(this.listener.heading) - dx * Math.cos(this.listener.heading);
-    panner.pan.value = Math.max(-1, Math.min(1, right / Math.max(distance, 1)));
+    panner.pan.value = heard.pan;
     gain.connect(panner).connect(bus.out);
     // Let the nodes be collected once the sound has finished.
     setTimeout(() => gain.disconnect(), 8000);

@@ -160,15 +160,16 @@ export interface RoadHit {
   /** Closest point on that road's centre line. */
   x: number;
   z: number;
+  surface: RoadSurface;
 }
 
 /** The nearest road to (x, z). */
 export function nearestRoad(x: number, z: number): RoadHit {
-  const best: RoadHit = { edge: Infinity, x: 0, z: 0 };
+  const best: RoadHit = { edge: Infinity, x: 0, z: 0, surface: "dirt" };
   for (const r of ROADS) {
     const near = nearestOnPolyline(x, z, r.points);
     const edge = near.distance - r.width / 2;
-    if (edge < best.edge) Object.assign(best, { edge, x: near.x, z: near.z });
+    if (edge < best.edge) Object.assign(best, { edge, x: near.x, z: near.z, surface: r.surface });
   }
   return best;
 }

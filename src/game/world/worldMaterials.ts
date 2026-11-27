@@ -1,5 +1,6 @@
 import { MeshStandardMaterial } from "three";
 import { addWindSway } from "@/game/ambient/wind";
+import { addWaterSurface } from "./waterShader";
 
 // Shared materials for the village. Most scenery is vertex-coloured, so one material covers it.
 
@@ -8,7 +9,7 @@ export const WORLD_MATERIALS = {
   painted: new MeshStandardMaterial({ vertexColors: true, roughness: 0.88 }),
   /** Same, but for instanced meshes whose per-instance colour tints the vertex colour. */
   instanced: new MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
-  water: new MeshStandardMaterial({ color: "#7aa3a2", roughness: 0.18, metalness: 0 }),
+  water: new MeshStandardMaterial({ color: "#3f6466", roughness: 0.06, metalness: 0 }),
   /** Warm glow for lamp bulbs and lit windows. */
   glow: new MeshStandardMaterial({ color: "#ffd9a0", emissive: "#ffb85c", emissiveIntensity: 2.2 }),
   // Both road surfaces are pulled towards the camera so they never flicker against the
@@ -30,6 +31,7 @@ export const WORLD_MATERIALS = {
 
 // Trees, grass, flowers and crops all sway in the evening breeze.
 addWindSway(WORLD_MATERIALS.instanced);
+addWaterSurface(WORLD_MATERIALS.water);
 
 /** The village palette, so the same "whitewash" or "saffron" is used everywhere. */
 export const PALETTE = {

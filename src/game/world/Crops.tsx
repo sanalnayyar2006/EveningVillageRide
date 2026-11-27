@@ -6,7 +6,8 @@ import { mulberry32 } from "@/utils/math";
 import { GeometryBatch } from "./batch";
 import { boundsOf, inPolygon } from "./data/geometry";
 import { FIELDS, type Field } from "./data/layout";
-import { createInstances, type InstanceSpec } from "./instancing";
+import { DetailCells } from "./DetailCells";
+import { createDetailGroup, type InstanceSpec } from "./instancing";
 import { heightAt, roadEdgeDistance } from "./terrain";
 import { WORLD_MATERIALS } from "./worldMaterials";
 
@@ -14,6 +15,11 @@ type Crop = "mustard" | "wheat" | "paddy";
 
 /** Row and plant spacing in metres. */
 const SPACING = { across: 1.3, along: 0.9 };
+
+/** Cell size (m), and the distances (m) where plants simplify and then vanish into the haze. */
+const CELL_SIZE = 50;
+const DETAIL_DISTANCE = 45;
+const DRAW_DISTANCE = 150;
 
 const CROP_SHAPES: Record<Crop, (b: GeometryBatch) => void> = {
   // Green stems topped with a cloud of yellow flowers.
@@ -51,9 +57,16 @@ const CROP_SHAPES: Record<Crop, (b: GeometryBatch) => void> = {
   },
 };
 
-function shape(crop: Crop): BufferGeometry {
+/** Far off, a whole plant is one small lump of its colour. */
+const FAR_CROP_SHAPES: Record<Crop, (b: GeometryBatch) => void> = {
+  mustard: (b) => b.blob(0.22, [0, 0.8, 0], "#e3c234", [1.2, 0.8, 1.2], 0),
+  wheat: (b) => b.cone(0.2, 0.95, [0, 0.47, 0], "#d6b052", 3),
+  paddy: (b) => b.cone(0.18, 0.55, [0, 0.27, 0], "#7fb640", 3),
+};
+
+function shape(build: (b: GeometryBatch) => void): BufferGeometry {
   const batch = new GeometryBatch();
-  CROP_SHAPES[crop](batch);
+  build(batch);
   return batch.build()!;
 }
 
@@ -84,24 +97,40 @@ function plantField(field: Field, seed: number): InstanceSpec[] {
   return plants;
 }
 
-/** Every crop in every field, one instanced draw call per crop type. */
+/** Every crop in every field, drawn by distance (see DetailCells). */
 export function Crops() {
-  const meshes = useMemo(() => {
+  const { groups, geometries } = useMemo(() => {
     const crops: Crop[] = ["mustard", "wheat", "paddy"];
-    return crops.map((crop, cropIndex) => {
+    const geometries: BufferGeometry[] = [];
+    const groups = crops.map((crop, cropIndex) => {
       const fields = FIELDS.filter((f) => f.use === crop);
       const plants = fields.flatMap((field, i) => plantField(field, cropIndex * 100 + i));
-      return createInstances(shape(crop), WORLD_MATERIALS.instanced, plants, false);
+      const near = shape(CROP_SHAPES[crop]);
+      const far = shape(FAR_CROP_SHAPES[crop]);
+      geometries.push(near, far);
+      return createDetailGroup(
+        {
+          name: `crop:${crop}`,
+          near,
+          far,
+          material: WORLD_MATERIALS.instanced,
+          castShadow: false,
+          farFrom: DETAIL_DISTANCE,
+          hideFrom: DRAW_DISTANCE,
+        },
+        plants,
+        CELL_SIZE,
+      );
     });
+    return { groups, geometries };
   }, []);
 
-  useEffect(() => () => meshes.forEach((mesh) => mesh.dispose()), [meshes]);
-
-  return (
-    <>
-      {meshes.map((mesh) => (
-        <primitive key={mesh.uuid} object={mesh} />
-      ))}
-    </>
+  useEffect(
+    () => () => {
+      for (const geometry of geometries) geometry.dispose();
+    },
+    [geometries],
   );
+
+  return <DetailCells groups={groups} />;
 }

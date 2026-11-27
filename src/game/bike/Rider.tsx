@@ -3,10 +3,13 @@
 import { useFrame } from "@react-three/fiber";
 import { useLayoutEffect, useRef } from "react";
 import { CylinderGeometry, Group, Mesh, SphereGeometry, Vector3, type Material } from "three";
+import { Merged } from "@/game/core/Merged";
 import { PhoneModel } from "@/game/photography/PhoneModel";
+import { PHOTO_CONFIG } from "@/game/photography/photoConfig";
 import { useBikeStore } from "@/store/bikeStore";
 import { usePhotoStore } from "@/store/photoStore";
-import { smoothstep } from "@/utils/math";
+import { MAX_DT } from "@/game/core/frameOrder";
+import { damp, smoothstep } from "@/utils/math";
 import { placeBetween, solveTwoBone } from "@/utils/limbs";
 import { gripPosition, pedalPosition } from "./bikeGeometry";
 import { RIDER_MATERIALS as mat } from "./bikeMaterials";
@@ -51,6 +54,45 @@ const HIDE_DISTANCE = 0.9;
 /** Feet sit slightly above the pedal axle. */
 const FOOT_LIFT = 0.045;
 
+/**
+ * How the body shifts (bike space, m) out of the saddle. Standing: up and over
+ * the cranks. Stopped: forward off the saddle, astride the top tube.
+ */
+const STANDING = new Vector3(0, 0.07, 0.12);
+const STOPPED = new Vector3(0, -0.13, 0.17);
+/** Side-to-side rock while standing on the pedals (m). */
+const STANDING_SWAY = 0.035;
+/** Climbs steeper than this (radians) get the rider out of the saddle. */
+const CLIMB_PITCH = 0.05;
+/** Pulling away below this speed (m/s) is done standing too. */
+const PULL_AWAY_SPEED = 1.8;
+/** Below this speed (m/s) the left foot comes off the pedal and down to the road. */
+const STOP_SPEED = 0.3;
+/** Where the left foot rests on the road, in bike space. */
+const FOOT_ON_GROUND = new Vector3(0.36, 0.05, 0.0);
+/** How far the stopped bike tilts onto that foot (radians). */
+export const STOPPED_TILT = 0.15;
+/** How quickly the rider settles into a new posture (per second). */
+const POSTURE_RATE = 4;
+
+/** Shared with BikeModel, which tilts the bike onto the rider's foot. 0..1 each. */
+export const riderPosture = { standing: 0, footDown: 0 };
+
+/**
+ * The rider's eyes in bike space (heading not applied), following the body as
+ * it slides off the saddle and the bike tilts onto the foot. Used by the phone camera.
+ */
+export function riderEye(out: Vector3): Vector3 {
+  const { footDown } = riderPosture;
+  const tilt = STOPPED_TILT * footDown;
+  const height = PHOTO_CONFIG.eye.height + STOPPED.y * footDown;
+  return out.set(
+    height * Math.sin(tilt),
+    height * Math.cos(tilt),
+    PHOTO_CONFIG.eye.forward + STOPPED.z * footDown,
+  );
+}
+
 interface LimbStyle {
   upperRadius: number;
   lowerRadius: number;
@@ -92,12 +134,17 @@ const end = new Vector3();
 const target = new Vector3();
 const grip = new Vector3();
 const headWorld = new Vector3();
+const bodyShift = new Vector3();
+const hip = new Vector3();
+const shoulder = new Vector3();
+const phoneTarget = new Vector3();
 
 /** Right-hand target for phone `raise` 0..1: handlebar → pocket → up in front of the face. */
-function phoneHandTarget(raise: number, handlebar: Vector3, out: Vector3): Vector3 {
+function phoneHandTarget(raise: number, handlebar: Vector3, shift: Vector3, out: Vector3): Vector3 {
   const toPocket = smoothstep(0, 0.4, raise);
   const toFace = smoothstep(0.4, 1, raise);
-  return out.lerpVectors(handlebar, PHONE_REACH.pocket, toPocket).lerp(PHONE_REACH.hold, toFace);
+  out.lerpVectors(handlebar, phoneTarget.copy(PHONE_REACH.pocket).add(shift), toPocket);
+  return out.lerp(phoneTarget.copy(PHONE_REACH.hold).add(shift), toFace);
 }
 
 /** Solve the IK for one limb and move its meshes into place. */
@@ -124,6 +171,7 @@ function poseLimb(
 /** A seated rider whose feet follow the pedals and hands follow the handlebar. */
 export function Rider() {
   const group = useRef<Group>(null);
+  const upperBody = useRef<Group>(null);
   const torso = useRef<Mesh>(null);
   const head = useRef<Group>(null);
   const legLeft = useRef<Group>(null);
@@ -143,33 +191,37 @@ export function Rider() {
     });
   }, []);
 
-  useFrame((state) => {
-    const { crankAngle, steer } = useBikeStore.getState().telemetry;
+  useFrame((state, frameDelta) => {
+    const dt = Math.min(frameDelta, MAX_DT);
+    const { crankAngle, steer, speed, pitch, pedaling } = useBikeStore.getState().telemetry;
     const { raise } = usePhotoStore.getState().rig;
 
+    // Out of the saddle to climb or pull away; foot down once stopped.
+    const climbing = pedaling && (pitch > CLIMB_PITCH || Math.abs(speed) < PULL_AWAY_SPEED);
+    const stopped = !pedaling && Math.abs(speed) < STOP_SPEED;
+    const settle = damp(POSTURE_RATE, dt);
+    riderPosture.standing += ((climbing ? 1 : 0) - riderPosture.standing) * settle;
+    riderPosture.footDown += ((stopped ? 1 : 0) - riderPosture.footDown) * settle;
+    const { standing, footDown } = riderPosture;
+    bodyShift.copy(STANDING).multiplyScalar(standing).addScaledVector(STOPPED, footDown);
+    // Rock towards whichever pedal is pushing down.
+    bodyShift.x += Math.cos(crankAngle) * STANDING_SWAY * standing;
+    upperBody.current?.position.copy(bodyShift);
+
     pedalPosition(crankAngle, 1, target).y += FOOT_LIFT;
-    poseLimb(legLeft.current, JOINTS.hipLeft, target, BODY.thigh, BODY.shin, KNEE_POLE);
+    target.lerp(FOOT_ON_GROUND, footDown);
+    hip.copy(JOINTS.hipLeft).add(bodyShift);
+    poseLimb(legLeft.current, hip, target, BODY.thigh, BODY.shin, KNEE_POLE);
     pedalPosition(crankAngle, -1, target).y += FOOT_LIFT;
-    poseLimb(legRight.current, JOINTS.hipRight, target, BODY.thigh, BODY.shin, KNEE_POLE);
+    hip.copy(JOINTS.hipRight).add(bodyShift);
+    poseLimb(legRight.current, hip, target, BODY.thigh, BODY.shin, KNEE_POLE);
 
     gripPosition(steer, 1, target);
-    poseLimb(
-      armLeft.current,
-      JOINTS.shoulderLeft,
-      target,
-      BODY.upperArm,
-      BODY.forearm,
-      ELBOW_POLE_LEFT,
-    );
-    phoneHandTarget(raise, gripPosition(steer, -1, grip), target);
-    poseLimb(
-      armRight.current,
-      JOINTS.shoulderRight,
-      target,
-      BODY.upperArm,
-      BODY.forearm,
-      ELBOW_POLE_RIGHT,
-    );
+    shoulder.copy(JOINTS.shoulderLeft).add(bodyShift);
+    poseLimb(armLeft.current, shoulder, target, BODY.upperArm, BODY.forearm, ELBOW_POLE_LEFT);
+    phoneHandTarget(raise, gripPosition(steer, -1, grip), bodyShift, target);
+    shoulder.copy(JOINTS.shoulderRight).add(bodyShift);
+    poseLimb(armRight.current, shoulder, target, BODY.upperArm, BODY.forearm, ELBOW_POLE_RIGHT);
 
     if (phone.current) {
       // The phone appears once the hand is in the pocket.
@@ -194,35 +246,39 @@ export function Rider() {
 
   return (
     <group ref={group}>
-      {/* Kurta: torso plus a hem that flares over the hips. */}
-      <mesh ref={torso} geometry={LIMB} material={mat.kurta} />
-      <mesh material={mat.kurta} position={[0, 1.08, -0.22]}>
-        <cylinderGeometry args={[0.17, 0.23, 0.26, 14, 1, true]} />
-      </mesh>
-      <mesh
-        material={mat.scarf}
-        position={[0, BODY.neck.y - 0.02, BODY.neck.z]}
-        rotation-x={Math.PI / 2 - 0.25}
-      >
-        <torusGeometry args={[0.09, 0.03, 8, 16]} />
-      </mesh>
-      <mesh geometry={JOINT} material={mat.kurta} position={JOINTS.shoulderLeft} scale={0.065} />
-      <mesh geometry={JOINT} material={mat.kurta} position={JOINTS.shoulderRight} scale={0.065} />
+      <group ref={upperBody}>
+        {/* Kurta: torso plus a hem that flares over the hips. */}
+        <mesh ref={torso} geometry={LIMB} material={mat.kurta} />
+        <mesh material={mat.kurta} position={[0, 1.08, -0.22]}>
+          <cylinderGeometry args={[0.17, 0.23, 0.26, 14, 1, true]} />
+        </mesh>
+        <mesh
+          material={mat.scarf}
+          position={[0, BODY.neck.y - 0.02, BODY.neck.z]}
+          rotation-x={Math.PI / 2 - 0.25}
+        >
+          <torusGeometry args={[0.09, 0.03, 8, 16]} />
+        </mesh>
+        <mesh geometry={JOINT} material={mat.kurta} position={JOINTS.shoulderLeft} scale={0.065} />
+        <mesh geometry={JOINT} material={mat.kurta} position={JOINTS.shoulderRight} scale={0.065} />
 
-      <group ref={head} position={[0, BODY.neck.y + 0.15, BODY.neck.z + 0.03]}>
-        <mesh material={mat.skin} position={[0, -0.09, 0]}>
-          <cylinderGeometry args={[0.045, 0.05, 0.08, 10]} />
-        </mesh>
-        <mesh material={mat.skin} scale={[0.1, 0.115, 0.105]}>
-          <sphereGeometry args={[1, 16, 12]} />
-        </mesh>
-        <mesh material={mat.hair} position={[0, 0.025, -0.012]} scale={[0.106, 0.105, 0.11]}>
-          <sphereGeometry args={[1, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        </mesh>
-        {/* Nose. */}
-        <mesh material={mat.skin} position={[0, -0.01, 0.1]} scale={[0.018, 0.028, 0.025]}>
-          <sphereGeometry args={[1, 8, 6]} />
-        </mesh>
+        <group ref={head} position={[0, BODY.neck.y + 0.15, BODY.neck.z + 0.03]}>
+          <Merged>
+            <mesh material={mat.skin} position={[0, -0.09, 0]}>
+              <cylinderGeometry args={[0.045, 0.05, 0.08, 10]} />
+            </mesh>
+            <mesh material={mat.skin} scale={[0.1, 0.115, 0.105]}>
+              <sphereGeometry args={[1, 16, 12]} />
+            </mesh>
+            <mesh material={mat.hair} position={[0, 0.025, -0.012]} scale={[0.106, 0.105, 0.11]}>
+              <sphereGeometry args={[1, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            </mesh>
+            {/* Nose. */}
+            <mesh material={mat.skin} position={[0, -0.01, 0.1]} scale={[0.018, 0.028, 0.025]}>
+              <sphereGeometry args={[1, 8, 6]} />
+            </mesh>
+          </Merged>
+        </group>
       </group>
 
       <Limb ref={legLeft} style={LEG} />

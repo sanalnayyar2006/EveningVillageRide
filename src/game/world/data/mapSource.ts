@@ -5,7 +5,7 @@
 
 export type Point = [number, number];
 
-export const MAP = {
+const MAP = {
   /** Screenshot size in pixels. */
   imageSize: [1086, 916] as Point,
   /** Measured from the highway (~18 m wide, ~48 px) and typical house footprints. */

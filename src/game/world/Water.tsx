@@ -1,9 +1,12 @@
 "use client";
 
+import { useFrame } from "@react-three/fiber";
 import { useMemo } from "react";
 import { BufferAttribute, BufferGeometry } from "three";
+import { ambient } from "@/game/ambient/ambientState";
 import { POND, STREAM } from "./data/layout";
 import { POND_WATER_Y, streamWaterY } from "./terrain";
+import { waterUniforms } from "./waterShader";
 import { WORLD_MATERIALS } from "./worldMaterials";
 
 /** The water reaches a little under the banks so no gap shows at the edge. */
@@ -44,9 +47,12 @@ function buildStream(): BufferGeometry {
   return geometry;
 }
 
-/** Stream and pond surfaces. Flat for now; Phase 5 adds movement and reflections. */
+/** Stream and pond surfaces, rippling and mirroring the evening sky (see waterShader). */
 export function Water() {
   const stream = useMemo(() => buildStream(), []);
+  useFrame(() => {
+    waterUniforms.uWaterTime.value = ambient.time;
+  });
   return (
     <>
       <mesh geometry={stream} material={WORLD_MATERIALS.water} />
